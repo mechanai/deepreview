@@ -12,25 +12,29 @@ Parse "$ARGUMENTS" the same way as /deepreview:
 
 Set ITERATION=1
 
-STEP 2: RUN INITIAL DEEPREVIEW
-Run `/deepreview $TARGET` (dispatch the full deepreview pipeline as described in the deepreview command).
+STEP 2: RUN INITIAL DEEPREVIEW (full pipeline with cross-validation)
+Run the full deepreview pipeline (Stages 1-5 from the deepreview command):
+- Determine SESSION_DIR and write input.txt
+- Stage 1: 5 parallel reviewers
+- Stage 2: 5 parallel validators (cross-validation)
+- Stage 3: Synthesizer
+- Stage 4: Implementation planner
 
-Wait for the pipeline to complete through Stage 4 (implementation plan).
-
-Record the stats from the synthesis: count of critical, warning, and suggestion findings.
+Record the stats from the synthesis return: count of critical, warning, and suggestion findings.
 
 STEP 3: CHECK EXIT CONDITION
-If the synthesis has 0 critical AND 0 warning AND 0 suggestion findings:
+If the synthesis/review has 0 critical AND 0 warning AND 0 suggestion findings:
 - Tell the user: "deepreviewloop complete after $ITERATION iteration(s). No findings remain."
 - STOP.
 
 STEP 4: APPLY ALL FIXES
-Dispatch Stage 5 (applier) automatically — do NOT ask the user for permission.
+Dispatch the applier automatically — do NOT ask the user for permission.
+Use the Task tool with subagent_type="deepreview-applier":
 "Read the implementation plan at $SESSION_DIR/implementation-plan.md. Apply the fixes."
 
 Wait for the applier to return.
 
-STEP 5: INCREMENT AND RE-REVIEW
+STEP 5: INCREMENT AND RE-REVIEW (lightweight — NO cross-validation)
 Set ITERATION = ITERATION + 1
 
 If ITERATION > 5:
@@ -40,15 +44,50 @@ If ITERATION > 5:
 - If user says stop → STOP.
 - If user says continue → reset limit to ITERATION + 5 and proceed.
 
-Now re-run the review on the CURRENT STATE of the code:
-- MODE=pr: run `git diff main > $SESSION_DIR-iter$ITERATION/input.txt` (review the updated branch, not the original PR diff)
-- MODE=branch: run `git diff main > $SESSION_DIR-iter$ITERATION/input.txt`
-- MODE=files: re-read the same files into `$SESSION_DIR-iter$ITERATION/input.txt`
+Create new session directory: SESSION_DIR="reviews/loop-iter$ITERATION-$(date +%Y-%m-%d-%H%M%S)"
+Run `mkdir -p $SESSION_DIR`
 
-Set SESSION_DIR="$SESSION_DIR-iter$ITERATION"
-Create the directory with `mkdir -p $SESSION_DIR`
+Prepare fresh input:
+- MODE=pr or MODE=branch: run `git diff main > $SESSION_DIR/input.txt`
+- MODE=files: re-read the same files into `$SESSION_DIR/input.txt`
 
-Run the full deepreview pipeline (Stages 1-4) on the new input.
+Check if input.txt is empty. If empty, tell user "Nothing to review — all changes resolved." and STOP.
+
+NOW RUN A LIGHTWEIGHT REVIEW (Stages 1, 3, 4 only — NO cross-validation):
+
+The key difference: iteration 2+ skips cross-validation entirely. This prevents the validators from filtering out new issues introduced by fixes. Each iteration is a fresh, unbiased review.
+
+Stage 1 — DISPATCH 5 PARALLEL REVIEWERS:
+Each reviewer prompt MUST include: "This is a fresh review. You have no prior context about this code. Review it as if seeing it for the first time. Do not assume anything is correct just because it looks intentional."
+
+Task 1 — Use the Task tool with subagent_type="deepreview-correctness":
+"This is a fresh review. You have no prior context about this code. Review it as if seeing it for the first time. Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-correctness.md."
+
+Task 2 — Use the Task tool with subagent_type="deepreview-security":
+"This is a fresh review. You have no prior context about this code. Review it as if seeing it for the first time. Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-security.md."
+
+Task 3 — Use the Task tool with subagent_type="deepreview-architecture":
+"This is a fresh review. You have no prior context about this code. Review it as if seeing it for the first time. Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-architecture.md."
+
+Task 4 — Use the Task tool with subagent_type="deepreview-docs":
+"This is a fresh review. You have no prior context about this code. Review it as if seeing it for the first time. Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-docs.md."
+
+Task 5 — Use the Task tool with subagent_type="deepreview-compatibility":
+"This is a fresh review. You have no prior context about this code. Review it as if seeing it for the first time. Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-compatibility.md."
+
+Wait for all 5. Record which succeeded.
+
+Stage 3 (skip Stage 2) — DISPATCH SYNTHESIZER DIRECTLY ON RAW REVIEWS:
+Task 6 — Use the Task tool with subagent_type="deepreview-synthesizer":
+"Read the reviews at: $SESSION_DIR/review-correctness.md, $SESSION_DIR/review-security.md, $SESSION_DIR/review-architecture.md, $SESSION_DIR/review-docs.md, $SESSION_DIR/review-compatibility.md. Write the synthesis to $SESSION_DIR/synthesis.md."
+
+Record the stats line.
+
+Stage 4 — DISPATCH PLANNER:
+Task 7 — Use the Task tool with subagent_type="deepreview-planner":
+"Read the synthesis at $SESSION_DIR/synthesis.md. Write the implementation plan to $SESSION_DIR/implementation-plan.md."
+
+Record the summary line.
 
 Go to STEP 3.
 
@@ -67,3 +106,5 @@ IMPORTANT RULES:
 - Apply ALL findings (critical, warning, AND suggestion) — the goal is a clean review.
 - Do NOT ask the user for permission to apply fixes. Apply automatically.
 - DO ask the user if iteration limit is hit or deadlock is detected.
+- Iteration 2+ MUST skip cross-validation and MUST include "fresh review" framing in prompts.
+- Each iteration uses a NEW session directory — never reuse a previous one.
