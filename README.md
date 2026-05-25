@@ -52,7 +52,15 @@ In any OpenCode session inside a git repo:
 /deepreview 123                    # Review PR #123
 /deepreview path/to/spec.md        # Review a spec or plan
 /deepreview doc1.md doc2.md        # Review multiple files
+
+/deepreviewloop                    # Review + fix loop until clean
+/deepreviewloop 123                # Same, targeting a PR
+/deepreviewloop spec.md            # Same, targeting files
 ```
+
+`/deepreviewloop` runs the full review, applies all fixes automatically, then re-reviews.
+It repeats until no findings remain or hits the iteration limit (5, extendable). Pauses
+on decision deadlocks (same finding persists across iterations).
 
 The pipeline runs automatically. At the end, you'll see a summary and be asked whether
 to apply the fixes.
