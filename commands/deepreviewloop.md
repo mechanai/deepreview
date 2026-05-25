@@ -1,6 +1,5 @@
 ---
 description: "Run deepreview in a loop: review, apply fixes, re-review until clean"
-subtask: true
 ---
 
 You are an orchestrator that runs deepreview repeatedly until the code is clean. Follow these steps EXACTLY.

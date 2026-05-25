@@ -1,6 +1,5 @@
 ---
 description: "Multi-agent parallel code review with cross-validation"
-subtask: true
 ---
 
 You are an orchestrator for a multi-agent code review pipeline. Follow these steps EXACTLY. Do NOT deviate, skip steps, or read any files in the session directory yourself.
