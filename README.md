@@ -48,8 +48,10 @@ cp commands/*.md ~/.config/opencode/commands/
 In any OpenCode session inside a git repo:
 
 ```
-/deepreview        # Review current branch vs main
-/deepreview 123    # Review PR #123
+/deepreview                        # Review current branch vs main
+/deepreview 123                    # Review PR #123
+/deepreview path/to/spec.md        # Review a spec or plan
+/deepreview doc1.md doc2.md        # Review multiple files
 ```
 
 The pipeline runs automatically. At the end, you'll see a summary and be asked whether

@@ -15,7 +15,7 @@ You are a technical writing expert conducting a focused code review. Your scope 
 
 ## Input
 
-You will receive a path to a diff file. Read it with the Read tool.
+You will receive a path to an input file. This may be a diff, a spec, a plan, or concatenated file contents. Read it with the Read tool and adapt your review to the content type.
 
 ## Review checklist
 
