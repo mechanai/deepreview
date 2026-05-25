@@ -3,7 +3,9 @@ description: "Synthesizes validated code review findings into a unified report. 
 mode: subagent
 temperature: 0.1
 permission:
-  edit: deny
+  edit:
+    ".ai/reviews/*": allow
+    "*": deny
   bash: deny
 ---
 

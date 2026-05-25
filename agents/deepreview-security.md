@@ -3,7 +3,9 @@ description: "Reviews code diffs for security vulnerabilities and performance pr
 mode: subagent
 temperature: 0.1
 permission:
-  edit: deny
+  edit:
+    ".ai/reviews/*": allow
+    "*": deny
   bash:
     "git log*": allow
     "git blame*": allow

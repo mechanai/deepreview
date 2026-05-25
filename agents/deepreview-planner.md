@@ -3,7 +3,9 @@ description: "Creates a concrete implementation plan from a code review synthesi
 mode: subagent
 temperature: 0.1
 permission:
-  edit: deny
+  edit:
+    ".ai/reviews/*": allow
+    "*": deny
   bash:
     "git log*": allow
     "git blame*": allow

@@ -3,7 +3,9 @@ description: "Cross-validates code review findings by checking claims against ac
 mode: subagent
 temperature: 0.1
 permission:
-  edit: deny
+  edit:
+    ".ai/reviews/*": allow
+    "*": deny
   bash:
     "git log*": allow
     "git blame*": allow
