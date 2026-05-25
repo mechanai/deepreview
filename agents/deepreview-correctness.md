@@ -3,9 +3,7 @@ description: "Reviews code diffs for correctness: logic errors, bugs, edge cases
 mode: subagent
 temperature: 0.1
 permission:
-  edit:
-    ".ai/reviews/*": allow
-    "*": deny
+  edit: allow
   bash:
     "git log*": allow
     "git blame*": allow
