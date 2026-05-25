@@ -44,7 +44,7 @@ If ITERATION > 5:
 - If user says stop → STOP.
 - If user says continue → reset limit to ITERATION + 5 and proceed.
 
-Create new session directory: SESSION_DIR="reviews/loop-iter$ITERATION-$(date +%Y-%m-%d-%H%M%S)"
+Create new session directory: SESSION_DIR=".ai/reviews/loop-iter$ITERATION-$(date +%Y-%m-%d-%H%M%S)"
 Run `mkdir -p $SESSION_DIR`
 
 Prepare fresh input:

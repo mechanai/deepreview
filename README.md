@@ -83,10 +83,10 @@ to apply the fixes.
 
 ## Output
 
-All review artifacts are saved to `reviews/<branch-or-PR>-<date>/`:
+All review artifacts are saved to `.ai/reviews/<branch-or-PR>-<date>/`:
 
 ```
-reviews/feature-xyz-2025-05-10/
+.ai/reviews/feature-xyz-2025-05-10/
 ├── diff.txt
 ├── review-correctness.md
 ├── review-security.md

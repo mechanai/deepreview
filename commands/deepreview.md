@@ -12,9 +12,9 @@ Classify "$ARGUMENTS":
 - If it is empty → MODE=branch
 
 Set SESSION_DIR based on mode:
-- MODE=pr: SESSION_DIR="reviews/$ARGUMENTS-$(date +%Y-%m-%d)"
-- MODE=files: SESSION_DIR="reviews/files-$(date +%Y-%m-%d-%H%M%S)"
-- MODE=branch: SESSION_DIR="reviews/$(git branch --show-current)-$(date +%Y-%m-%d)"
+- MODE=pr: SESSION_DIR=".ai/reviews/$ARGUMENTS-$(date +%Y-%m-%d)"
+- MODE=files: SESSION_DIR=".ai/reviews/files-$(date +%Y-%m-%d-%H%M%S)"
+- MODE=branch: SESSION_DIR=".ai/reviews/$(git branch --show-current)-$(date +%Y-%m-%d)"
 
 Create the directory with `mkdir -p $SESSION_DIR`
 
