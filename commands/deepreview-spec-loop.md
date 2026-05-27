@@ -19,10 +19,17 @@ Run the full deepreview-spec pipeline (Stages 1-5 from the deepreview-spec comma
 
 Record the stats from the synthesis return: count of critical, warning, and suggestion findings.
 
-STEP 3: CHECK EXIT CONDITION
-If the synthesis/review has 0 critical AND 0 warning AND 0 suggestion findings:
+STEP 3: CHECK EXIT CONDITIONS
+Track the total finding count (critical + warning + suggestion) for each iteration in a list: HISTORY.
+
+A) CLEAN EXIT: If 0 critical AND 0 warning AND 0 suggestion:
 - Tell the user: "deepreview-spec-loop complete after $ITERATION iteration(s). No findings remain."
 - STOP.
+
+B) PLATEAU EXIT: If ITERATION >= 3 and the total has not decreased compared to the minimum of any previous iteration for 2 consecutive iterations (i.e., the last 2 totals are both >= the historical minimum):
+- Tell the user: "deepreview-spec-loop plateau after $ITERATION iteration(s). Findings are oscillating (history: [list totals]) and not converging. The spec has been substantively improved but remaining findings likely reflect reviewer opinion differences."
+- Show the latest stats breakdown (critical/warning/suggestion).
+- STOP. Do NOT ask to continue — plateaus in spec review are a natural stopping point.
 
 STEP 4: APPLY ALL FIXES
 Dispatch the applier automatically — do NOT ask the user for permission.
@@ -34,12 +41,10 @@ Wait for the applier to return.
 STEP 5: INCREMENT AND RE-REVIEW
 Set ITERATION = ITERATION + 1
 
-If ITERATION > 5:
-- Tell the user: "deepreview-spec-loop hit iteration limit (5). Remaining findings may require manual intervention or a design decision."
+If ITERATION > 7:
+- Tell the user: "deepreview-spec-loop hit iteration limit (7). This should not normally happen — plateau detection should have stopped earlier."
 - Show the latest stats.
-- Ask the user: "Continue for more iterations, or stop here?"
-- If user says stop → STOP.
-- If user says continue → reset limit to ITERATION + 5 and proceed.
+- STOP.
 
 Create new session directory: SESSION_DIR=".ai/reviews/spec-loop-iter$ITERATION-$(date +%Y-%m-%d-%H%M%S)"
 Run `mkdir -p $SESSION_DIR`
