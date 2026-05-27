@@ -32,7 +32,7 @@ review content into its own context, keeping token usage minimal.
 ## Install
 
 ```bash
-npx @mechanai/deepreview install
+npx @mechanai/deepreview@latest install
 ```
 
 This copies agent and command files into `~/.config/opencode/` and adds `.ai/deepreview/`
@@ -42,13 +42,13 @@ the package to sync changes.
 To add the gitignore entry to your global gitignore instead:
 
 ```bash
-npx @mechanai/deepreview install --gitignore-global
+npx @mechanai/deepreview@latest install --gitignore-global
 ```
 
 To remove:
 
 ```bash
-npx @mechanai/deepreview uninstall
+npx @mechanai/deepreview@latest uninstall
 ```
 
 ## Usage
