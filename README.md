@@ -35,8 +35,15 @@ review content into its own context, keeping token usage minimal.
 npx @mechanai/deepreview install
 ```
 
-This copies agent and command files into `~/.config/opencode/`. Run it again after
-updating the package to sync any changes.
+This copies agent and command files into `~/.config/opencode/` and adds `.ai/deepreview/`
+to the local `.gitignore` (where review output is written). Run it again after updating
+the package to sync changes.
+
+To add the gitignore entry to your global gitignore instead:
+
+```bash
+npx @mechanai/deepreview install --gitignore-global
+```
 
 To remove:
 
@@ -106,10 +113,10 @@ to apply the fixes.
 
 ## Output
 
-All review artifacts are saved to `.ai/reviews/<branch-or-PR>-<date>/`:
+All review artifacts are saved to `.ai/deepreview/<branch-or-PR>-<date>/`:
 
 ```
-.ai/reviews/feature-xyz-2025-05-10/
+.ai/deepreview/feature-xyz-2025-05-10/
 ├── diff.txt
 ├── review-correctness.md
 ├── review-security.md

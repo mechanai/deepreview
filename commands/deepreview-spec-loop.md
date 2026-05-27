@@ -11,7 +11,7 @@ STEP 1: DETERMINE INPUT
 
 STEP 2: RUN INITIAL DEEPREVIEW-SPEC (full pipeline with cross-validation)
 Run the full deepreview-spec pipeline (Stages 1-5 from the deepreview-spec command):
-- Determine SESSION_DIR=".ai/reviews/spec-loop-iter1-$(date +%Y-%m-%d-%H%M%S)" and write input.txt
+- Determine SESSION_DIR=".ai/deepreview/spec-loop-iter1-$(date +%Y-%m-%d-%H%M%S)" and write input.txt
 - Stage 1: 5 parallel reviewers (completeness, consistency, feasibility, docs, architecture)
 - Stage 2: 5 parallel validators (cross-validation)
 - Stage 3: Synthesizer
@@ -46,7 +46,7 @@ If ITERATION > 7:
 - Show the latest stats.
 - STOP.
 
-Create new session directory: SESSION_DIR=".ai/reviews/spec-loop-iter$ITERATION-$(date +%Y-%m-%d-%H%M%S)"
+Create new session directory: SESSION_DIR=".ai/deepreview/spec-loop-iter$ITERATION-$(date +%Y-%m-%d-%H%M%S)"
 Run `mkdir -p $SESSION_DIR`
 
 Re-read the same files into `$SESSION_DIR/input.txt`:

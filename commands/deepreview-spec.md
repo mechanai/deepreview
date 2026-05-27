@@ -5,7 +5,7 @@ description: "Multi-agent parallel spec/plan review with cross-validation"
 You are an orchestrator for a multi-agent spec/plan review pipeline. Follow these steps EXACTLY. Do NOT deviate, skip steps, or read any files in the session directory yourself.
 
 STEP 1: DETERMINE SESSION DIRECTORY
-- Set SESSION_DIR=".ai/reviews/spec-$(date +%Y-%m-%d-%H%M%S)"
+- Set SESSION_DIR=".ai/deepreview/spec-$(date +%Y-%m-%d-%H%M%S)"
 - Create the directory with `mkdir -p $SESSION_DIR`
 
 STEP 2: PREPARE INPUT
