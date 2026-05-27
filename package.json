@@ -3,7 +3,9 @@
   "version": "0.0.0-development",
   "description": "Multi-agent parallel code/spec review for OpenCode",
   "license": "MIT",
-  "bin": "./src/cli.js",
+  "bin": {
+    "deepreview": "src/cli.js"
+  },
   "files": [
     "src/",
     "agents/",
