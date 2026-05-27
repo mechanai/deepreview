@@ -31,7 +31,7 @@ Use the Task tool with subagent_type="deepreview-applier":
 
 Wait for the applier to return.
 
-STEP 5: INCREMENT AND RE-REVIEW (lightweight — NO cross-validation)
+STEP 5: INCREMENT AND RE-REVIEW
 Set ITERATION = ITERATION + 1
 
 If ITERATION > 5:
