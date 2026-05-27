@@ -1,0 +1,14 @@
+{
+  "name": "@mechanai/deepreview",
+  "version": "0.3.0",
+  "description": "Multi-agent parallel code review for OpenCode",
+  "license": "MIT",
+  "bin": {
+    "deepreview": "./src/cli.js"
+  },
+  "files": [
+    "src/",
+    "agents/",
+    "commands/"
+  ]
+}

@@ -31,28 +31,17 @@ review content into its own context, keeping token usage minimal.
 
 ## Install
 
-Copy or symlink the agent and command files into your OpenCode config:
-
 ```bash
-# Clone the repo
-git clone <repo-url> ~/.local/share/deepreview
-
-# Symlink agents
-for f in ~/.local/share/deepreview/agents/*.md; do
-  ln -sf "$f" ~/.config/opencode/agents/
-done
-
-# Symlink commands
-for f in ~/.local/share/deepreview/commands/*.md; do
-  ln -sf "$f" ~/.config/opencode/commands/
-done
+npx @mechanai/deepreview install
 ```
 
-Or copy directly:
+This copies agent and command files into `~/.config/opencode/`. Run it again after
+updating the package to sync any changes.
+
+To remove:
 
 ```bash
-cp agents/*.md ~/.config/opencode/agents/
-cp commands/*.md ~/.config/opencode/commands/
+npx @mechanai/deepreview uninstall
 ```
 
 ## Usage
