@@ -25,11 +25,16 @@ function ensureGitignore(filepath) {
 
 function globalGitignorePath() {
   const { execSync } = require("node:child_process");
+  let filepath;
   try {
-    return execSync("git config --global core.excludesFile", { encoding: "utf8" }).trim();
+    filepath = execSync("git config --global core.excludesFile", { encoding: "utf8" }).trim();
   } catch {
-    return path.join(os.homedir(), ".config", "git", "ignore");
+    filepath = path.join(os.homedir(), ".config", "git", "ignore");
   }
+  if (filepath.startsWith("~/")) {
+    filepath = path.join(os.homedir(), filepath.slice(2));
+  }
+  return filepath;
 }
 
 function install(flags) {
