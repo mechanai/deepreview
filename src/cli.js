@@ -37,7 +37,7 @@ function globalGitignorePath() {
   return filepath;
 }
 
-function install(flags) {
+function install(options) {
   const agentsSrc = path.join(PACKAGE_ROOT, "agents");
   const commandsSrc = path.join(PACKAGE_ROOT, "commands");
   const agentsDest = path.join(CONFIG_DIR, "agents");
@@ -62,7 +62,7 @@ function install(flags) {
 
   console.log(`Installed ${count} files to ${CONFIG_DIR}`);
 
-  if (flags.has("--gitignore-global")) {
+  if (options["gitignore-global"]) {
     const ignorePath = globalGitignorePath();
     fs.mkdirSync(path.dirname(ignorePath), { recursive: true });
     if (ensureGitignore(ignorePath)) {
@@ -93,12 +93,27 @@ function uninstall() {
   console.log(`Removed ${count} files from ${CONFIG_DIR}`);
 }
 
-const args = process.argv.slice(2);
-const command = args.find((a) => !a.startsWith("-"));
-const flags = new Set(args.filter((a) => a.startsWith("-")));
+const { parseArgs } = require("node:util");
+
+let parsed;
+try {
+  parsed = parseArgs({
+    args: process.argv.slice(2),
+    allowPositionals: true,
+    strict: true,
+    options: {
+      "gitignore-global": { type: "boolean", default: false },
+    },
+  });
+} catch (e) {
+  console.error(e.message);
+  process.exit(1);
+}
+
+const command = parsed.positionals[0];
 
 if (command === "install") {
-  install(flags);
+  install(parsed.values);
 } else if (command === "uninstall") {
   uninstall();
 } else {
