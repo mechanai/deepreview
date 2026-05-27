@@ -44,6 +44,7 @@ Write your review to the output path provided. Use this format for each finding:
 ```
 
 Severity guide:
+
 - **critical:** This cannot be built as specified — fundamental blocker
 - **warning:** This will be significantly harder than the spec implies — risk of rework
 - **suggestion:** This is feasible but there's a simpler approach

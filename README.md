@@ -93,23 +93,23 @@ to apply the fixes.
 
 ### Code review
 
-| Agent | Focus |
-|-------|-------|
-| correctness | Logic bugs, edge cases, error handling, missing tests |
-| security | Vulnerabilities, auth issues, performance bottlenecks |
-| architecture | Patterns, coupling, abstractions, complexity |
-| docs | Comment quality, stale claims, duplicate content |
-| compatibility | Breaking changes, API contract violations |
+| Agent         | Focus                                                 |
+| ------------- | ----------------------------------------------------- |
+| correctness   | Logic bugs, edge cases, error handling, missing tests |
+| security      | Vulnerabilities, auth issues, performance bottlenecks |
+| architecture  | Patterns, coupling, abstractions, complexity          |
+| docs          | Comment quality, stale claims, duplicate content      |
+| compatibility | Breaking changes, API contract violations             |
 
 ### Spec/plan review
 
-| Agent | Focus |
-|-------|-------|
-| spec-completeness | Gaps, missing edge cases, undefined behavior |
-| spec-consistency | Contradictions, name mismatches, type drift |
-| spec-feasibility | Can it be built, implicit dependencies, complexity |
-| docs | Comment quality, stale claims, duplicate content |
-| architecture | Patterns, coupling, abstractions, complexity |
+| Agent             | Focus                                              |
+| ----------------- | -------------------------------------------------- |
+| spec-completeness | Gaps, missing edge cases, undefined behavior       |
+| spec-consistency  | Contradictions, name mismatches, type drift        |
+| spec-feasibility  | Can it be built, implicit dependencies, complexity |
+| docs              | Comment quality, stale claims, duplicate content   |
+| architecture      | Patterns, coupling, abstractions, complexity       |
 
 ## Output
 

@@ -42,6 +42,7 @@ Write your review to the output path provided. Use this format for each finding:
 ```
 
 Severity guide:
+
 - **critical:** Doc/comment claims something false about the code (will mislead developers or users)
 - **warning:** Duplicate or stale content that wastes reader attention
 - **suggestion:** Verbose text that could be tightened

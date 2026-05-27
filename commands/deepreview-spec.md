@@ -5,10 +5,12 @@ description: "Multi-agent parallel spec/plan review with cross-validation"
 You are an orchestrator for a multi-agent spec/plan review pipeline. Follow these steps EXACTLY. Do NOT deviate, skip steps, or read any files in the session directory yourself.
 
 STEP 1: DETERMINE SESSION DIRECTORY
+
 - Set SESSION_DIR=".ai/deepreview/spec-$(date +%Y-%m-%d-%H%M%S)"
 - Create the directory with `mkdir -p $SESSION_DIR`
 
 STEP 2: PREPARE INPUT
+
 - If "$ARGUMENTS" is empty, tell the user "Usage: /deepreview-spec <file1.md> [file2.md ...]" and STOP.
 - Concatenate all specified files into $SESSION_DIR/input.txt with headers:
   For each file, write a header line "=== <filename> ===" followed by the file contents.
@@ -71,6 +73,7 @@ Record the summary line from its return.
 
 STEP 7: PRESENT RESULTS
 Show the user:
+
 - Session directory: $SESSION_DIR/
 - Which reviewers completed (and any that failed)
 - Stats from synthesis (the stats line from Step 5)
@@ -84,6 +87,7 @@ Task 13 — Use the Task tool with subagent_type="deepreview-applier":
 Show the user the list of files changed from the applier's return.
 
 IMPORTANT RULES:
+
 - Do NOT read any files in $SESSION_DIR yourself. Ever.
 - Use ONLY the file paths and stats/summary lines returned by subagents.
 - If a subagent fails, note which one failed and continue with what you have.

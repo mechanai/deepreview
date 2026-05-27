@@ -46,6 +46,7 @@ Write your review to the output path provided. Use this format for each finding:
 ```
 
 Severity guide:
+
 - **critical:** An implementer would have to guess or stop and ask — blocks progress
 - **warning:** Missing detail that could lead to bugs or rework later
 - **suggestion:** Nice to have — would improve clarity but not strictly required

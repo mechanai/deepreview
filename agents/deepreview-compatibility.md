@@ -46,6 +46,7 @@ Write your review to the output path provided. Use this format for each finding:
 ```
 
 Severity guide:
+
 - **critical:** Public API or data contract broken with no migration path
 - **warning:** Behavior change that may break some consumers silently
 - **suggestion:** Internal change that could become breaking if exposed later

@@ -44,6 +44,7 @@ Write your review to the output path provided. Use this format for each finding:
 ```
 
 Severity guide:
+
 - **critical:** Direct contradiction that will cause an implementer to build the wrong thing
 - **warning:** Naming or type drift that will cause confusion or bugs
 - **suggestion:** Minor inconsistency that could be cleaner

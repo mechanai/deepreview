@@ -6,6 +6,7 @@ You are an orchestrator that runs deepreview repeatedly until the code is clean.
 
 STEP 1: DETERMINE INPUT MODE
 Parse "$ARGUMENTS" the same way as /deepreview:
+
 - If it is a number → MODE=pr, TARGET="$ARGUMENTS"
 - If it is a file path or multiple file paths → MODE=files, TARGET="$ARGUMENTS"
 - If it is empty → MODE=branch, TARGET=""
@@ -14,6 +15,7 @@ Set ITERATION=1
 
 STEP 2: RUN INITIAL DEEPREVIEW (full pipeline with cross-validation)
 Run the full deepreview pipeline (Stages 1-5 from the deepreview command):
+
 - Determine SESSION_DIR and write input.txt
 - Stage 1: 5 parallel reviewers
 - Stage 2: 5 parallel validators (cross-validation)
@@ -24,6 +26,7 @@ Record the stats from the synthesis return: count of critical, warning, and sugg
 
 STEP 3: CHECK EXIT CONDITION
 If the synthesis/review has 0 critical AND 0 warning AND 0 suggestion findings:
+
 - Tell the user: "deepreviewloop complete after $ITERATION iteration(s). No findings remain."
 - STOP.
 
@@ -38,6 +41,7 @@ STEP 5: INCREMENT AND RE-REVIEW (lightweight — NO cross-validation)
 Set ITERATION = ITERATION + 1
 
 If ITERATION > 5:
+
 - Tell the user: "deepreviewloop hit iteration limit (5). Remaining findings may require manual intervention or a design decision."
 - Show the latest stats.
 - Ask the user: "Continue for more iterations, or stop here?"
@@ -48,6 +52,7 @@ Create new session directory: SESSION_DIR=".ai/deepreview/loop-iter$ITERATION-$(
 Run `mkdir -p $SESSION_DIR`
 
 Prepare fresh input:
+
 - MODE=pr or MODE=branch: run `git diff main > $SESSION_DIR/input.txt`
 - MODE=files: re-read the same files into `$SESSION_DIR/input.txt`
 
@@ -95,12 +100,14 @@ STEP 6: DECISION DEADLOCK DETECTION
 If two consecutive iterations produce the SAME findings (same file:line, same issue title), this indicates a deadlock — the applier is making changes that don't resolve the issue, or the reviewer keeps flagging the same thing.
 
 When deadlock is detected:
+
 - Tell the user: "Deadlock detected: the following findings persist across iterations:"
 - List the repeated findings.
 - Ask: "How would you like to resolve these? Options: skip these findings, provide guidance, or stop the loop."
 - Follow the user's instruction.
 
 IMPORTANT RULES:
+
 - Do NOT read any review/synthesis/plan files yourself. Ever.
 - Use ONLY the file paths and stats/summary lines returned by subagents.
 - Apply ALL findings (critical, warning, AND suggestion) — the goal is a clean review.

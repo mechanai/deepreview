@@ -5,12 +5,14 @@ description: "Run deepreview-spec in a loop: review, apply fixes, re-review unti
 You are an orchestrator that runs deepreview-spec repeatedly until the spec/plan is clean. Follow these steps EXACTLY.
 
 STEP 1: DETERMINE INPUT
+
 - If "$ARGUMENTS" is empty, tell the user "Usage: /deepreview-spec-loop <file1.md> [file2.md ...]" and STOP.
 - Set FILES="$ARGUMENTS"
 - Set ITERATION=1
 
 STEP 2: RUN INITIAL DEEPREVIEW-SPEC (full pipeline with cross-validation)
 Run the full deepreview-spec pipeline (Stages 1-5 from the deepreview-spec command):
+
 - Determine SESSION_DIR=".ai/deepreview/spec-loop-iter1-$(date +%Y-%m-%d-%H%M%S)" and write input.txt
 - Stage 1: 5 parallel reviewers (completeness, consistency, feasibility, docs, architecture)
 - Stage 2: 5 parallel validators (cross-validation)
@@ -23,10 +25,12 @@ STEP 3: CHECK EXIT CONDITIONS
 Track the total finding count (critical + warning + suggestion) for each iteration in a list: HISTORY.
 
 A) CLEAN EXIT: If 0 critical AND 0 warning AND 0 suggestion:
+
 - Tell the user: "deepreview-spec-loop complete after $ITERATION iteration(s). No findings remain."
 - STOP.
 
 B) PLATEAU EXIT: If ITERATION >= 3 and the total has not decreased compared to the minimum of any previous iteration for 2 consecutive iterations (i.e., the last 2 totals are both >= the historical minimum):
+
 - Tell the user: "deepreview-spec-loop plateau after $ITERATION iteration(s). Findings are oscillating (history: [list totals]) and not converging. The spec has been substantively improved but remaining findings likely reflect reviewer opinion differences."
 - Show the latest stats breakdown (critical/warning/suggestion).
 - STOP. Do NOT ask to continue — plateaus in spec review are a natural stopping point.
@@ -42,6 +46,7 @@ STEP 5: INCREMENT AND RE-REVIEW
 Set ITERATION = ITERATION + 1
 
 If ITERATION > 7:
+
 - Tell the user: "deepreview-spec-loop hit iteration limit (7). This should not normally happen — plateau detection should have stopped earlier."
 - Show the latest stats.
 - STOP.
@@ -104,18 +109,21 @@ STEP 6: DIVERGENCE AND DEADLOCK DETECTION
 Track finding counts across iterations. Detect TWO failure modes:
 
 A) DIVERGENCE: If total findings (critical + warning + suggestion) INCREASE from one iteration to the next:
+
 - Tell the user: "Divergence detected: findings increased from N to M. The review is not converging — fixes are introducing new issues or reviewers are finding new stylistic concerns."
 - Show the iteration-over-iteration stats.
 - Ask: "Accept current state, revert last iteration's changes, or continue with only critical/warning fixes (ignore suggestions)?"
 - Follow the user's instruction.
 
 B) DEADLOCK: If two consecutive iterations produce the same findings (same location, same issue title):
+
 - Tell the user: "Deadlock detected: the following findings persist across iterations:"
 - List the repeated findings.
 - Ask: "How would you like to resolve these? Options: skip these findings, provide guidance, or stop the loop."
 - Follow the user's instruction.
 
 IMPORTANT RULES:
+
 - Do NOT read any review/synthesis/plan files yourself. Ever.
 - Use ONLY the file paths and stats/summary lines returned by subagents.
 - Apply ALL findings (critical, warning, AND suggestion) — the goal is a clean review.

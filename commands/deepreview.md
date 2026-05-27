@@ -6,12 +6,14 @@ You are an orchestrator for a multi-agent code review pipeline. Follow these ste
 
 STEP 1: DETERMINE INPUT MODE AND SESSION DIRECTORY
 Classify "$ARGUMENTS":
+
 - If it is a number → MODE=pr
 - If it is a file path (ends in .md, .txt, .yaml, .json, or file exists on disk) → MODE=files
 - If it is multiple space-separated file paths → MODE=files
 - If it is empty → MODE=branch
 
 Set SESSION_DIR based on mode:
+
 - MODE=pr: SESSION_DIR=".ai/deepreview/$ARGUMENTS-$(date +%Y-%m-%d)"
 - MODE=files: SESSION_DIR=".ai/deepreview/files-$(date +%Y-%m-%d-%H%M%S)"
 - MODE=branch: SESSION_DIR=".ai/deepreview/$(git branch --show-current)-$(date +%Y-%m-%d)"
@@ -19,6 +21,7 @@ Set SESSION_DIR based on mode:
 Create the directory with `mkdir -p $SESSION_DIR`
 
 STEP 2: PREPARE INPUT
+
 - MODE=pr: run `gh pr diff $ARGUMENTS > $SESSION_DIR/input.txt`
 - MODE=branch: run `git diff main > $SESSION_DIR/input.txt`
 - MODE=files: concatenate all specified files into $SESSION_DIR/input.txt with headers:
@@ -28,6 +31,7 @@ STEP 2: PREPARE INPUT
 Check if input.txt is empty (0 bytes). If empty, tell the user "Nothing to review." and STOP.
 
 Set INPUT_DESCRIPTION based on mode:
+
 - MODE=pr: "a PR diff"
 - MODE=branch: "a branch diff against main"
 - MODE=files: "the following files: <list of filenames>"
@@ -86,6 +90,7 @@ Record the summary line from its return.
 
 STEP 7: PRESENT RESULTS
 Show the user:
+
 - Session directory: $SESSION_DIR/
 - Which reviewers completed (and any that failed)
 - Stats from synthesis (the stats line from Step 5)
@@ -99,6 +104,7 @@ Task 13 — Use the Task tool with subagent_type="deepreview-applier":
 Show the user the list of files changed from the applier's return.
 
 IMPORTANT RULES:
+
 - Do NOT read any files in $SESSION_DIR yourself. Ever.
 - Use ONLY the file paths and stats/summary lines returned by subagents.
 - If a subagent fails, note which one failed and continue with what you have.
