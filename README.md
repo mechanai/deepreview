@@ -1,6 +1,6 @@
 # deepreview
 
-Multi-agent parallel code review for [OpenCode](https://opencode.ai). Spawns 5 specialized
+Multi-agent parallel code/spec review for [OpenCode](https://opencode.ai). Spawns 5 specialized
 review agents, cross-validates findings, synthesizes results, and produces an actionable
 implementation plan.
 
