@@ -1,6 +1,11 @@
 "use strict";
 
 const matter = require("gray-matter");
+const yaml = require("js-yaml");
+
+/** gray-matter engine restricted to safe YAML parsing (no !!js/function etc.) */
+const safeYamlEngine = (s) => yaml.load(s, { schema: yaml.FAILSAFE_SCHEMA });
+const matterOptions = { engines: { yaml: safeYamlEngine } };
 
 /**
  * Parse a threads.md file into an array of finding objects.
@@ -14,7 +19,7 @@ function parseThreads(content) {
   const documents = splitDocuments(content);
 
   for (const doc of documents) {
-    const parsed = matter(doc);
+    const parsed = matter(doc, matterOptions);
     const { path, line, startLine } = parsed.data;
     if (!path || !line) continue;
 

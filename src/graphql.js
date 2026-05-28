@@ -1,25 +1,36 @@
 "use strict";
 
-const { execSync } = require("node:child_process");
+const { execFileSync } = require("node:child_process");
 
 /**
  * Execute a GraphQL query via `gh api graphql --input -`.
  *
  * @param {string} query - GraphQL query/mutation string
  * @param {object} variables - Variables object
- * @returns {object} Parsed JSON response data
- * @throws {Error} On non-zero exit or GraphQL errors
+ * @returns {object} The `data` field from the GraphQL response
+ * @throws {Error} On non-zero exit, non-JSON response, or GraphQL errors
  */
 function graphql(query, variables = {}) {
   const body = JSON.stringify({ query, variables });
-  const result = execSync("gh api graphql --input -", {
-    input: body,
-    encoding: "utf8",
-    stdio: ["pipe", "pipe", "pipe"],
-    maxBuffer: 10 * 1024 * 1024,
-  });
+  let result;
+  try {
+    result = execFileSync("gh", ["api", "graphql", "--input", "-"], {
+      input: body,
+      encoding: "utf8",
+      stdio: ["pipe", "pipe", "pipe"],
+      maxBuffer: 10 * 1024 * 1024,
+    });
+  } catch (err) {
+    const stderr = err.stderr ? err.stderr.toString().trim() : "";
+    throw new Error(`gh graphql failed: ${stderr || err.message}`);
+  }
 
-  const parsed = JSON.parse(result);
+  let parsed;
+  try {
+    parsed = JSON.parse(result);
+  } catch {
+    throw new Error(`gh graphql returned non-JSON: ${result.slice(0, 200)}`);
+  }
   if (parsed.errors && parsed.errors.length > 0) {
     const msg = parsed.errors.map((e) => e.message).join("; ");
     const err = new Error(`GraphQL error: ${msg}`);
@@ -36,7 +47,9 @@ function graphql(query, variables = {}) {
  * @returns {{owner: string, name: string, prNodeId: string, headOid: string, state: string}}
  */
 function getPrInfo(prNumber) {
-  const repoResult = execSync("gh repo view --json owner,name", { encoding: "utf8" });
+  const repoResult = execFileSync("gh", ["repo", "view", "--json", "owner,name"], {
+    encoding: "utf8",
+  });
   const repo = JSON.parse(repoResult);
 
   const data = graphql(

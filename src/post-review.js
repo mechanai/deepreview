@@ -3,7 +3,12 @@
 
 const fs = require("node:fs");
 const crypto = require("node:crypto");
-const { execSync } = require("node:child_process");
+const { execFileSync } = require("node:child_process");
+
+function sleepMs(ms) {
+  const seconds = Math.ceil(ms / 1000);
+  execFileSync("sleep", [String(seconds)], { stdio: "ignore" });
+}
 const { parseThreads } = require("./parse-threads.js");
 const { classifyFindings } = require("./diff-classifier.js");
 const { graphql, getPrInfo } = require("./graphql.js");
@@ -26,11 +31,9 @@ function extractFindingId(body) {
 
 function buildReviewBody(tier3Findings, owner, name, headOid) {
   let body = "";
-  if (tier3Findings.length > 0) {
-    for (const f of tier3Findings) {
-      const permalink = `https://github.com/${owner}/${name}/blob/${headOid}/${f.path}#L${f.line}`;
-      body += `<details>\n<summary><a href="${permalink}"><code>${f.path}:${f.line}</code></a></summary>\n\n${f.body}\n</details>\n\n`;
-    }
+  for (const f of tier3Findings) {
+    const permalink = `https://github.com/${owner}/${name}/blob/${headOid}/${f.path}#L${f.line}`;
+    body += `<details>\n<summary><a href="${permalink}"><code>${f.path}:${f.line}</code></a></summary>\n\n${f.body}\n</details>\n\n`;
   }
   body += AI_TRAILER;
   return body;
@@ -42,11 +45,12 @@ function findPendingReview(prNodeId) {
       query ($prId: ID!) {
         node(id: $prId) {
           ... on PullRequest {
-            reviews(states: PENDING, first: 1) {
+            viewerLatestReview: reviews(last: 1, states: PENDING, author: "@me") {
               nodes {
                 id
                 body
                 comments(first: 100) {
+                  totalCount
                   nodes {
                     id
                     body
@@ -63,7 +67,13 @@ function findPendingReview(prNodeId) {
     `,
     { prId: prNodeId },
   );
-  const reviews = data.node.reviews.nodes;
+  const reviews = data.node.viewerLatestReview.nodes;
+  if (reviews.length > 0 && reviews[0].comments.totalCount > 100) {
+    const totalCount = reviews[0].comments.totalCount;
+    console.warn(
+      `WARN: Pending review has ${totalCount} comments, only first 100 checked for deduplication. Duplicates may occur.`,
+    );
+  }
   return reviews.length > 0 ? reviews[0] : null;
 }
 
@@ -186,22 +196,21 @@ function updateExistingThreads(existingReview, findings) {
   }
 
   console.log(`Updated ${toUpdate.length} existing threads.`);
-  for (const { finding } of toUpdate) {
-    finding._updated = true;
-  }
+  const updatedFindings = new Set(toUpdate.map(({ finding }) => finding));
+  return updatedFindings;
 }
 
-function main({
-  _graphqlFn = graphql,
-  readFileFn = fs.readFileSync,
-  argv = process.argv.slice(2),
-} = {}) {
+function main({ readFileFn = fs.readFileSync, argv = process.argv.slice(2) } = {}) {
   const [threadsPath, prNumberStr] = argv;
   if (!threadsPath || !prNumberStr) {
     console.error("Usage: post-review.js <threads.md> <PR_NUMBER>");
     process.exit(1);
   }
   const prNumber = Number(prNumberStr);
+  if (!Number.isInteger(prNumber) || prNumber <= 0) {
+    console.error("Error: PR number must be a positive integer.");
+    process.exit(1);
+  }
 
   // Read threads
   const threadsContent = readFileFn(threadsPath, "utf8");
@@ -230,7 +239,7 @@ function main({
   }
 
   // Read diff for classification
-  const diff = execSync(`gh pr diff ${prNumber}`, { encoding: "utf8" });
+  const diff = execFileSync("gh", ["pr", "diff", String(prNumber)], { encoding: "utf8" });
 
   // Classify findings
   const classified = classifyFindings(findings, diff);
@@ -250,11 +259,13 @@ function main({
   const existingReview = findPendingReview(prNodeId);
   let reviewId;
 
+  let updatedFindings = new Set();
+
   if (existingReview) {
     reviewId = existingReview.id;
     console.log(`Found existing pending review: ${reviewId}`);
     updateReviewBody(reviewId, buildReviewBody(tier3, owner, name, headOid));
-    updateExistingThreads(existingReview, [...tier1, ...tier2]);
+    updatedFindings = updateExistingThreads(existingReview, [...tier1, ...tier2]);
   } else {
     const reviewBody = buildReviewBody(tier3, owner, name, headOid);
     reviewId = createPendingReview(prNodeId, headOid, reviewBody);
@@ -265,7 +276,7 @@ function main({
   let failures = 0;
   const inlineFindings = [...tier1, ...tier2];
   for (const f of inlineFindings) {
-    if (f._updated) continue;
+    if (updatedFindings.has(f)) continue;
     const id = findingId(f.path, f.startLine, f.line);
     const body = embedFindingId(f.body, id);
 
@@ -282,7 +293,7 @@ function main({
           console.warn(
             `Rate limited on ${f.path}:${f.line}. Waiting 60s (retry ${attempt + 1}/2)...`,
           );
-          execSync("sleep 60");
+          sleepMs(60_000);
           try {
             if (f.tier === 1) {
               addLineThread(reviewId, f.path, f.line, f.startLine, body);
@@ -308,8 +319,10 @@ function main({
     }
   }
 
+  const skipped = inlineFindings.filter((f) => updatedFindings.has(f)).length;
+  const attempted = inlineFindings.length - skipped;
   console.log(
-    `Posted ${inlineFindings.length - failures}/${inlineFindings.length} inline threads. ` +
+    `Posted ${attempted - failures}/${attempted} inline threads (${skipped} already up-to-date). ` +
       `${tier3.length} findings in review body.`,
   );
 
@@ -318,4 +331,8 @@ function main({
   }
 }
 
-main();
+if (require.main === module) {
+  main();
+}
+
+module.exports = { main };
