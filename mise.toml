@@ -18,8 +18,8 @@ description = "Lint repo"
 depends = ["lint:*"]
 
 [tasks."lint:oxlint"]
-description = "Lint JavaScript files"
-run = "bun x oxlint --deny pedantic src"
+description = "Lint TypeScript files"
+run = "bun x oxlint src .opencode"
 
 [tasks."lint:oxfmt"]
 description = "Check if files are formatted correctly"

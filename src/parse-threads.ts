@@ -1,39 +1,41 @@
 import matter from "gray-matter";
 import yaml from "js-yaml";
+import type { Finding } from "./diff-classifier.ts";
 
 /** gray-matter engine restricted to safe YAML parsing (no !!js/function etc.) */
-const safeYamlEngine = (s) => yaml.load(s, { schema: yaml.FAILSAFE_SCHEMA });
+const safeYamlEngine = (s: string): Record<string, unknown> =>
+  (yaml.load(s, { schema: yaml.FAILSAFE_SCHEMA }) as Record<string, unknown>) ?? {};
 const matterOptions = { engines: { yaml: safeYamlEngine } };
 
 /**
  * Parse a threads.md file into an array of finding objects.
  * The file uses --- separators between findings, each with YAML frontmatter.
- *
- * @param {string} content - Raw content of threads.md
- * @returns {Array<{path: string, line: number, startLine?: number, body: string}>}
  */
-function parseThreads(content) {
-  const findings = [];
+function parseThreads(content: string): Finding[] {
+  const findings: Finding[] = [];
   const documents = splitDocuments(content);
 
   for (const doc of documents) {
-    let parsed;
+    let parsed: matter.GrayMatterFile<string>;
     try {
       parsed = matter(doc, matterOptions);
-    } catch (err) {
-      console.warn(`Skipping malformed finding: ${err.message}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(`Skipping malformed finding: ${message}`);
       continue;
     }
-    const { path, line, startLine } = parsed.data;
-    const lineNum = Number(line);
-    if (!path || !Number.isFinite(lineNum)) continue;
+    const data = parsed.data as Record<string, unknown>;
+    const path = data.path as string | undefined;
+    const lineNum = Number(data.line);
+    if (path === null || path === undefined || path === "" || !Number.isFinite(lineNum)) continue;
 
-    const startLineNum = startLine ? Number(startLine) : undefined;
+    const startLineNum =
+      data.startLine !== null && data.startLine !== undefined ? Number(data.startLine) : undefined;
     findings.push({
       path,
       line: lineNum,
       startLine:
-        startLineNum && startLineNum > 0 && Number.isFinite(startLineNum)
+        startLineNum !== undefined && startLineNum > 0 && Number.isFinite(startLineNum)
           ? startLineNum
           : undefined,
       body: parsed.content.trim(),
@@ -45,7 +47,7 @@ function parseThreads(content) {
 
 const YAML_KEY_RE = /^\w[\w\s]*:/u;
 
-function peekIsYamlKey(lines, startIndex) {
+function peekIsYamlKey(lines: string[], startIndex: number): boolean {
   for (let j = startIndex; j < lines.length; j++) {
     if (lines[j].trim() === "") continue;
     return YAML_KEY_RE.test(lines[j].trim());
@@ -58,10 +60,10 @@ function peekIsYamlKey(lines, startIndex) {
  * Each document starts with "---" (YAML open), has frontmatter, then "---" (YAML close),
  * then body content until the next document or EOF.
  */
-function splitDocuments(content) {
+function splitDocuments(content: string): string[] {
   const lines = content.split("\n");
-  const documents = [];
-  let current = [];
+  const documents: string[] = [];
+  let current: string[] = [];
   let inFrontmatter = false;
   let foundFirstDoc = false;
 

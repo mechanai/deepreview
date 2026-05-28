@@ -1,13 +1,71 @@
-import { graphql } from "./graphql.js";
+import { graphql } from "./graphql.ts";
 
 const MAX_PAGES = 50;
 
-async function fetchRemainingComments(reviewId, initialPageInfo) {
-  const comments = [];
+interface PageInfo {
+  hasNextPage: boolean;
+  endCursor: string;
+}
+
+export interface ReviewComment {
+  id: string;
+  body: string;
+  path: string;
+  startLine: number | null;
+  line: number;
+}
+
+export interface PendingReview {
+  id: string;
+  body: string;
+  comments: {
+    totalCount: number;
+    nodes: ReviewComment[];
+  };
+}
+
+interface CommentsPage {
+  node: {
+    comments: {
+      pageInfo: PageInfo;
+      nodes: ReviewComment[];
+    };
+  };
+}
+
+interface FindPendingReviewResponse {
+  node: {
+    viewerLatestReview: {
+      nodes: Array<{
+        id: string;
+        body: string;
+        comments: {
+          totalCount: number;
+          pageInfo: PageInfo;
+          nodes: ReviewComment[];
+        };
+      }>;
+    };
+  };
+}
+
+interface CreateReviewResponse {
+  addPullRequestReview: {
+    pullRequestReview: {
+      id: string;
+    };
+  };
+}
+
+async function fetchRemainingComments(
+  reviewId: string,
+  initialPageInfo: PageInfo,
+): Promise<ReviewComment[]> {
+  const comments: ReviewComment[] = [];
   let pageInfo = initialPageInfo;
   let pages = 0;
   while (pageInfo.hasNextPage && pages++ < MAX_PAGES) {
-    const page = await graphql(
+    const page = await graphql<CommentsPage>(
       `
         query ($reviewId: ID!, $after: String!) {
           node(id: $reviewId) {
@@ -38,8 +96,8 @@ async function fetchRemainingComments(reviewId, initialPageInfo) {
   return comments;
 }
 
-export async function findPendingReview(prNodeId) {
-  const data = await graphql(
+export async function findPendingReview(prNodeId: string): Promise<PendingReview | null> {
+  const data = await graphql<FindPendingReviewResponse>(
     `
       query ($prId: ID!) {
         node(id: $prId) {
@@ -74,15 +132,19 @@ export async function findPendingReview(prNodeId) {
   if (reviews.length === 0) return null;
 
   const review = reviews[0];
-  const comments = [...review.comments.nodes];
+  const comments: ReviewComment[] = [...review.comments.nodes];
   const remaining = await fetchRemainingComments(review.id, review.comments.pageInfo);
   comments.push(...remaining);
 
   return { ...review, comments: { totalCount: review.comments.totalCount, nodes: comments } };
 }
 
-export async function createPendingReview(prNodeId, commitOid, body) {
-  const data = await graphql(
+export async function createPendingReview(
+  prNodeId: string,
+  commitOid: string,
+  body: string,
+): Promise<string> {
+  const data = await graphql<CreateReviewResponse>(
     `
       mutation ($input: AddPullRequestReviewInput!) {
         addPullRequestReview(input: $input) {
@@ -103,7 +165,7 @@ export async function createPendingReview(prNodeId, commitOid, body) {
   return data.addPullRequestReview.pullRequestReview.id;
 }
 
-export async function updateReviewBody(reviewId, body) {
+export async function updateReviewBody(reviewId: string, body: string): Promise<void> {
   await graphql(
     `
       mutation ($input: UpdatePullRequestReviewInput!) {
@@ -118,15 +180,21 @@ export async function updateReviewBody(reviewId, body) {
   );
 }
 
-export async function addLineThread(reviewId, path, line, startLine, body) {
-  const input = {
+export async function addLineThread(
+  reviewId: string,
+  path: string,
+  line: number,
+  startLine: number | undefined,
+  body: string,
+): Promise<void> {
+  const input: Record<string, unknown> = {
     pullRequestReviewId: reviewId,
     path,
     line,
     side: "RIGHT",
     body,
   };
-  if (startLine) {
+  if (startLine !== undefined && startLine > 0) {
     input.startLine = startLine;
     input.startSide = "RIGHT";
   }
@@ -144,7 +212,7 @@ export async function addLineThread(reviewId, path, line, startLine, body) {
   );
 }
 
-export async function addFileThread(reviewId, path, body) {
+export async function addFileThread(reviewId: string, path: string, body: string): Promise<void> {
   await graphql(
     `
       mutation ($input: AddPullRequestReviewThreadInput!) {
@@ -166,7 +234,7 @@ export async function addFileThread(reviewId, path, body) {
   );
 }
 
-export async function updateReviewComment(commentId, body) {
+export async function updateReviewComment(commentId: string, body: string): Promise<void> {
   await graphql(
     `
       mutation ($input: UpdatePullRequestReviewCommentInput!) {

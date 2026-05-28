@@ -1,6 +1,6 @@
 import { describe, it } from "bun:test";
 import assert from "node:assert/strict";
-import { classifyFindings } from "./diff-classifier.js";
+import { classifyFindings } from "./diff-classifier.ts";
 
 const SAMPLE_DIFF = [
   "diff --git a/pkg/server/handler.go b/pkg/server/handler.go",

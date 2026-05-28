@@ -1,6 +1,6 @@
 import { describe, it } from "bun:test";
 import assert from "node:assert/strict";
-import { parseThreads } from "./parse-threads.js";
+import { parseThreads } from "./parse-threads.ts";
 
 describe("parseThreads", () => {
   it("parses a single finding", () => {

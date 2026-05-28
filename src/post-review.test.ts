@@ -1,7 +1,7 @@
 import { describe, it } from "bun:test";
 import assert from "node:assert/strict";
-import { parseThreads } from "./parse-threads.js";
-import { classifyFindings } from "./diff-classifier.js";
+import { parseThreads } from "./parse-threads.ts";
+import { classifyFindings } from "./diff-classifier.ts";
 
 describe("integration: parse → classify", () => {
   const threadsContent = [
