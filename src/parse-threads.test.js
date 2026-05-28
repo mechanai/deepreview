@@ -47,14 +47,7 @@ describe("parseThreads", () => {
   });
 
   it("ignores startLine: 0 (treats as single-line)", () => {
-    const input = [
-      "---",
-      "path: x.go",
-      "startLine: 0",
-      "line: 5",
-      "---",
-      "Body.",
-    ].join("\n");
+    const input = ["---", "path: x.go", "startLine: 0", "line: 5", "---", "Body."].join("\n");
 
     const result = parseThreads(input);
     assert.equal(result[0].startLine, undefined);

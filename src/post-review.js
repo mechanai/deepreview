@@ -38,27 +38,29 @@ function buildReviewBody(tier3Findings, owner, name, headOid) {
 
 function findPendingReview(prNodeId) {
   const data = graphql(
-    `query($prId: ID!) {
-      node(id: $prId) {
-        ... on PullRequest {
-          reviews(states: PENDING, first: 1) {
-            nodes {
-              id
-              body
-              comments(first: 100) {
-                nodes {
-                  id
-                  body
-                  path
-                  startLine
-                  line
+    `
+      query ($prId: ID!) {
+        node(id: $prId) {
+          ... on PullRequest {
+            reviews(states: PENDING, first: 1) {
+              nodes {
+                id
+                body
+                comments(first: 100) {
+                  nodes {
+                    id
+                    body
+                    path
+                    startLine
+                    line
+                  }
                 }
               }
             }
           }
         }
       }
-    }`,
+    `,
     { prId: prNodeId },
   );
   const reviews = data.node.reviews.nodes;
@@ -67,11 +69,15 @@ function findPendingReview(prNodeId) {
 
 function createPendingReview(prNodeId, commitOid, body) {
   const data = graphql(
-    `mutation($input: AddPullRequestReviewInput!) {
-      addPullRequestReview(input: $input) {
-        pullRequestReview { id }
+    `
+      mutation ($input: AddPullRequestReviewInput!) {
+        addPullRequestReview(input: $input) {
+          pullRequestReview {
+            id
+          }
+        }
       }
-    }`,
+    `,
     {
       input: {
         pullRequestId: prNodeId,
@@ -85,11 +91,15 @@ function createPendingReview(prNodeId, commitOid, body) {
 
 function updateReviewBody(reviewId, body) {
   graphql(
-    `mutation($input: UpdatePullRequestReviewInput!) {
-      updatePullRequestReview(input: $input) {
-        pullRequestReview { id }
+    `
+      mutation ($input: UpdatePullRequestReviewInput!) {
+        updatePullRequestReview(input: $input) {
+          pullRequestReview {
+            id
+          }
+        }
       }
-    }`,
+    `,
     { input: { pullRequestReviewId: reviewId, body } },
   );
 }
@@ -107,22 +117,30 @@ function addLineThread(reviewId, path, line, startLine, body) {
     input.startSide = "RIGHT";
   }
   graphql(
-    `mutation($input: AddPullRequestReviewThreadInput!) {
-      addPullRequestReviewThread(input: $input) {
-        thread { id }
+    `
+      mutation ($input: AddPullRequestReviewThreadInput!) {
+        addPullRequestReviewThread(input: $input) {
+          thread {
+            id
+          }
+        }
       }
-    }`,
+    `,
     { input },
   );
 }
 
 function addFileThread(reviewId, path, body) {
   graphql(
-    `mutation($input: AddPullRequestReviewThreadInput!) {
-      addPullRequestReviewThread(input: $input) {
-        thread { id }
+    `
+      mutation ($input: AddPullRequestReviewThreadInput!) {
+        addPullRequestReviewThread(input: $input) {
+          thread {
+            id
+          }
+        }
       }
-    }`,
+    `,
     {
       input: {
         pullRequestReviewId: reviewId,
@@ -154,11 +172,15 @@ function updateExistingThreads(existingReview, findings) {
   for (const { finding, commentId, id } of toUpdate) {
     const body = embedFindingId(finding.body, id);
     graphql(
-      `mutation($input: UpdatePullRequestReviewCommentInput!) {
-        updatePullRequestReviewComment(input: $input) {
-          pullRequestReviewComment { id }
+      `
+        mutation ($input: UpdatePullRequestReviewCommentInput!) {
+          updatePullRequestReviewComment(input: $input) {
+            pullRequestReviewComment {
+              id
+            }
+          }
         }
-      }`,
+      `,
       { input: { pullRequestReviewCommentId: commentId, body } },
     );
   }
@@ -169,7 +191,11 @@ function updateExistingThreads(existingReview, findings) {
   }
 }
 
-function main({ graphqlFn = graphql, readFileFn = fs.readFileSync, argv = process.argv.slice(2) } = {}) {
+function main({
+  _graphqlFn = graphql,
+  readFileFn = fs.readFileSync,
+  argv = process.argv.slice(2),
+} = {}) {
   const [threadsPath, prNumberStr] = argv;
   if (!threadsPath || !prNumberStr) {
     console.error("Usage: post-review.js <threads.md> <PR_NUMBER>");
@@ -253,7 +279,9 @@ function main({ graphqlFn = graphql, readFileFn = fs.readFileSync, argv = proces
       if (err.message.includes("rate limit") || err.message.includes("429")) {
         let posted = false;
         for (let attempt = 0; attempt < 2; attempt++) {
-          console.warn(`Rate limited on ${f.path}:${f.line}. Waiting 60s (retry ${attempt + 1}/2)...`);
+          console.warn(
+            `Rate limited on ${f.path}:${f.line}. Waiting 60s (retry ${attempt + 1}/2)...`,
+          );
           execSync("sleep 60");
           try {
             if (f.tier === 1) {

@@ -40,15 +40,17 @@ function getPrInfo(prNumber) {
   const repo = JSON.parse(repoResult);
 
   const data = graphql(
-    `query($owner: String!, $name: String!, $number: Int!) {
-      repository(owner: $owner, name: $name) {
-        pullRequest(number: $number) {
-          id
-          state
-          headRefOid
+    `
+      query ($owner: String!, $name: String!, $number: Int!) {
+        repository(owner: $owner, name: $name) {
+          pullRequest(number: $number) {
+            id
+            state
+            headRefOid
+          }
         }
       }
-    }`,
+    `,
     { owner: repo.owner.login, name: repo.name, number: prNumber },
   );
 
