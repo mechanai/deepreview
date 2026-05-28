@@ -47,14 +47,17 @@ export async function graphql(query, variables = {}) {
  * Get repo owner, name, and PR details.
  *
  * @param {number} prNumber
+ * @param {object} [options]
+ * @param {string} [options.cwd] - Working directory for `gh` CLI invocation
  * @returns {Promise<{owner: string, name: string, prNodeId: string, headOid: string, state: string}>}
  */
-export async function getPrInfo(prNumber) {
+export async function getPrInfo(prNumber, { cwd } = {}) {
   let stdout;
   try {
     ({ stdout } = await execFileAsync("gh", ["repo", "view", "--json", "owner,name"], {
       encoding: "utf8",
       signal: AbortSignal.timeout(TIMEOUT_MS),
+      cwd,
     }));
   } catch (err) {
     throw new Error(

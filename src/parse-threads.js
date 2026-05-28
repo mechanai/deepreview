@@ -17,7 +17,13 @@ function parseThreads(content) {
   const documents = splitDocuments(content);
 
   for (const doc of documents) {
-    const parsed = matter(doc, matterOptions);
+    let parsed;
+    try {
+      parsed = matter(doc, matterOptions);
+    } catch (err) {
+      console.warn(`Skipping malformed finding: ${err.message}`);
+      continue;
+    }
     const { path, line, startLine } = parsed.data;
     const lineNum = Number(line);
     if (!path || !Number.isFinite(lineNum)) continue;
@@ -26,12 +32,25 @@ function parseThreads(content) {
     findings.push({
       path,
       line: lineNum,
-      startLine: startLineNum && Number.isFinite(startLineNum) ? startLineNum : undefined,
+      startLine:
+        startLineNum && startLineNum > 0 && Number.isFinite(startLineNum)
+          ? startLineNum
+          : undefined,
       body: parsed.content.trim(),
     });
   }
 
   return findings;
+}
+
+const YAML_KEY_RE = /^\w[\w\s]*:/u;
+
+function peekIsYamlKey(lines, startIndex) {
+  for (let j = startIndex; j < lines.length; j++) {
+    if (lines[j].trim() === "") continue;
+    return YAML_KEY_RE.test(lines[j].trim());
+  }
+  return false;
 }
 
 /**
@@ -57,9 +76,15 @@ function splitDocuments(content) {
         inFrontmatter = false;
         current.push(line);
       } else {
-        documents.push(current.join("\n"));
-        current = [line];
-        inFrontmatter = true;
+        // Only split if this looks like a new document (next non-blank line has a YAML key)
+        const looksLikeNewDoc = peekIsYamlKey(lines, i + 1);
+        if (looksLikeNewDoc) {
+          documents.push(current.join("\n"));
+          current = [line];
+          inFrontmatter = true;
+        } else {
+          current.push(line);
+        }
       }
     } else if (foundFirstDoc) {
       current.push(line);

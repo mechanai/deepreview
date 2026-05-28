@@ -33,7 +33,7 @@ export const server: Plugin = async (input: PluginInput) => {
             });
             return result.summary;
           } catch (err) {
-            return JSON.stringify({ error: err instanceof Error ? err.message : String(err) });
+            throw err instanceof Error ? err : new Error(String(err));
           }
         },
       }),

@@ -9,7 +9,7 @@ import parseDiff from "parse-diff";
  *
  * @param {Array<{path: string, line: number, startLine?: number, body: string}>} findings
  * @param {string} diffText - Unified diff text
- * @returns {Array<{...finding, tier: 1|2|3}>}
+ * @returns {Array<{path: string, line: number, startLine?: number, body: string, tier: 1|2|3}>}
  */
 function classifyFindings(findings, diffText) {
   const parsed = parseDiff(diffText);

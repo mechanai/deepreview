@@ -165,3 +165,18 @@ export async function addFileThread(reviewId, path, body) {
     },
   );
 }
+
+export async function updateReviewComment(commentId, body) {
+  await graphql(
+    `
+      mutation ($input: UpdatePullRequestReviewCommentInput!) {
+        updatePullRequestReviewComment(input: $input) {
+          pullRequestReviewComment {
+            id
+          }
+        }
+      }
+    `,
+    { input: { pullRequestReviewCommentId: commentId, body } },
+  );
+}

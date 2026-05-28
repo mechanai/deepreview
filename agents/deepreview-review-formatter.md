@@ -15,7 +15,7 @@ You will receive:
 
 1. A path to `synthesis.md` — the unified review synthesis
 2. A path to `input.txt` — the PR diff
-3. Environment variable `$PR_HEAD_SHA` — the commit SHA for permalinks
+3. The PR head commit SHA — provided inline in the prompt text
 
 Read both files.
 
