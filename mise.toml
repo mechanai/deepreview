@@ -1,6 +1,5 @@
 [tools]
-node = "22"
-yarn = "4"
+bun = "1"
 
 [tasks.fmt]
 description = "Format repo"
@@ -12,7 +11,7 @@ run = "mise fmt"
 
 [tasks."fmt:oxfmt"]
 description = "Format files via oxfmt"
-run = "yarn oxfmt --write ."
+run = "bun x oxfmt --write ."
 
 [tasks.lint]
 description = "Lint repo"
@@ -20,8 +19,8 @@ depends = ["lint:*"]
 
 [tasks."lint:oxlint"]
 description = "Lint JavaScript files"
-run = "yarn oxlint --deny pedantic src"
+run = "bun x oxlint --deny pedantic src"
 
 [tasks."lint:oxfmt"]
 description = "Check if files are formatted correctly"
-run = "yarn oxfmt --check ."
+run = "bun x oxfmt --check ."

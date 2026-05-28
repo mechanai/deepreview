@@ -1,7 +1,5 @@
-"use strict";
-
-const matter = require("gray-matter");
-const yaml = require("js-yaml");
+import matter from "gray-matter";
+import yaml from "js-yaml";
 
 /** gray-matter engine restricted to safe YAML parsing (no !!js/function etc.) */
 const safeYamlEngine = (s) => yaml.load(s, { schema: yaml.FAILSAFE_SCHEMA });
@@ -21,12 +19,14 @@ function parseThreads(content) {
   for (const doc of documents) {
     const parsed = matter(doc, matterOptions);
     const { path, line, startLine } = parsed.data;
-    if (!path || !line) continue;
+    const lineNum = Number(line);
+    if (!path || !Number.isFinite(lineNum)) continue;
 
+    const startLineNum = startLine ? Number(startLine) : undefined;
     findings.push({
       path,
-      line: Number(line),
-      startLine: startLine && Number(startLine) !== 0 ? Number(startLine) : undefined,
+      line: lineNum,
+      startLine: startLineNum && Number.isFinite(startLineNum) ? startLineNum : undefined,
       body: parsed.content.trim(),
     });
   }
@@ -73,4 +73,4 @@ function splitDocuments(content) {
   return documents;
 }
 
-module.exports = { parseThreads };
+export { parseThreads };

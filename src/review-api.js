@@ -1,9 +1,45 @@
-"use strict";
+import { graphql } from "./graphql.js";
 
-const { graphql } = require("./graphql.js");
+const MAX_PAGES = 50;
 
-function findPendingReview(prNodeId) {
-  const data = graphql(
+async function fetchRemainingComments(reviewId, initialPageInfo) {
+  const comments = [];
+  let pageInfo = initialPageInfo;
+  let pages = 0;
+  while (pageInfo.hasNextPage && pages++ < MAX_PAGES) {
+    const page = await graphql(
+      `
+        query ($reviewId: ID!, $after: String!) {
+          node(id: $reviewId) {
+            ... on PullRequestReview {
+              comments(first: 100, after: $after) {
+                pageInfo {
+                  hasNextPage
+                  endCursor
+                }
+                nodes {
+                  id
+                  body
+                  path
+                  startLine
+                  line
+                }
+              }
+            }
+          }
+        }
+      `,
+      { reviewId, after: pageInfo.endCursor },
+    );
+    const next = page.node.comments;
+    comments.push(...next.nodes);
+    pageInfo = next.pageInfo;
+  }
+  return comments;
+}
+
+export async function findPendingReview(prNodeId) {
+  const data = await graphql(
     `
       query ($prId: ID!) {
         node(id: $prId) {
@@ -14,6 +50,10 @@ function findPendingReview(prNodeId) {
                 body
                 comments(first: 100) {
                   totalCount
+                  pageInfo {
+                    hasNextPage
+                    endCursor
+                  }
                   nodes {
                     id
                     body
@@ -31,17 +71,18 @@ function findPendingReview(prNodeId) {
     { prId: prNodeId },
   );
   const reviews = data.node.viewerLatestReview.nodes;
-  if (reviews.length > 0 && reviews[0].comments.totalCount > 100) {
-    const totalCount = reviews[0].comments.totalCount;
-    console.warn(
-      `WARN: Pending review has ${totalCount} comments, only first 100 checked for deduplication. Duplicates may occur.`,
-    );
-  }
-  return reviews.length > 0 ? reviews[0] : null;
+  if (reviews.length === 0) return null;
+
+  const review = reviews[0];
+  const comments = [...review.comments.nodes];
+  const remaining = await fetchRemainingComments(review.id, review.comments.pageInfo);
+  comments.push(...remaining);
+
+  return { ...review, comments: { totalCount: review.comments.totalCount, nodes: comments } };
 }
 
-function createPendingReview(prNodeId, commitOid, body) {
-  const data = graphql(
+export async function createPendingReview(prNodeId, commitOid, body) {
+  const data = await graphql(
     `
       mutation ($input: AddPullRequestReviewInput!) {
         addPullRequestReview(input: $input) {
@@ -62,8 +103,8 @@ function createPendingReview(prNodeId, commitOid, body) {
   return data.addPullRequestReview.pullRequestReview.id;
 }
 
-function updateReviewBody(reviewId, body) {
-  graphql(
+export async function updateReviewBody(reviewId, body) {
+  await graphql(
     `
       mutation ($input: UpdatePullRequestReviewInput!) {
         updatePullRequestReview(input: $input) {
@@ -77,7 +118,7 @@ function updateReviewBody(reviewId, body) {
   );
 }
 
-function addLineThread(reviewId, path, line, startLine, body) {
+export async function addLineThread(reviewId, path, line, startLine, body) {
   const input = {
     pullRequestReviewId: reviewId,
     path,
@@ -89,7 +130,7 @@ function addLineThread(reviewId, path, line, startLine, body) {
     input.startLine = startLine;
     input.startSide = "RIGHT";
   }
-  graphql(
+  await graphql(
     `
       mutation ($input: AddPullRequestReviewThreadInput!) {
         addPullRequestReviewThread(input: $input) {
@@ -103,8 +144,8 @@ function addLineThread(reviewId, path, line, startLine, body) {
   );
 }
 
-function addFileThread(reviewId, path, body) {
-  graphql(
+export async function addFileThread(reviewId, path, body) {
+  await graphql(
     `
       mutation ($input: AddPullRequestReviewThreadInput!) {
         addPullRequestReviewThread(input: $input) {
@@ -124,11 +165,3 @@ function addFileThread(reviewId, path, body) {
     },
   );
 }
-
-module.exports = {
-  findPendingReview,
-  createPendingReview,
-  updateReviewBody,
-  addLineThread,
-  addFileThread,
-};

@@ -1,25 +1,28 @@
-"use strict";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 
-const { execFileSync } = require("node:child_process");
+const execFileAsync = promisify(execFile);
+const TIMEOUT_MS = 30_000;
 
 /**
  * Execute a GraphQL query via `gh api graphql --input -`.
  *
  * @param {string} query - GraphQL query/mutation string
  * @param {object} variables - Variables object
- * @returns {object} The `data` field from the GraphQL response
+ * @returns {Promise<object>} The `data` field from the GraphQL response
  * @throws {Error} On non-zero exit, non-JSON response, or GraphQL errors
  */
-function graphql(query, variables = {}) {
+export async function graphql(query, variables = {}) {
   const body = JSON.stringify({ query, variables });
   let result;
   try {
-    result = execFileSync("gh", ["api", "graphql", "--input", "-"], {
+    const { stdout } = await execFileAsync("gh", ["api", "graphql", "--input", "-"], {
       input: body,
       encoding: "utf8",
-      stdio: ["pipe", "pipe", "pipe"],
       maxBuffer: 10 * 1024 * 1024,
+      signal: AbortSignal.timeout(TIMEOUT_MS),
     });
+    result = stdout;
   } catch (err) {
     const stderr = err.stderr ? err.stderr.toString().trim() : "";
     throw new Error(`gh graphql failed: ${stderr || err.message}`);
@@ -44,15 +47,23 @@ function graphql(query, variables = {}) {
  * Get repo owner, name, and PR details.
  *
  * @param {number} prNumber
- * @returns {{owner: string, name: string, prNodeId: string, headOid: string, state: string}}
+ * @returns {Promise<{owner: string, name: string, prNodeId: string, headOid: string, state: string}>}
  */
-function getPrInfo(prNumber) {
-  const repoResult = execFileSync("gh", ["repo", "view", "--json", "owner,name"], {
-    encoding: "utf8",
-  });
-  const repo = JSON.parse(repoResult);
+export async function getPrInfo(prNumber) {
+  let stdout;
+  try {
+    ({ stdout } = await execFileAsync("gh", ["repo", "view", "--json", "owner,name"], {
+      encoding: "utf8",
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    }));
+  } catch (err) {
+    throw new Error(
+      `Failed to query repository info via \`gh\`. Ensure \`gh auth login\` is complete.\n${err.message}`,
+    );
+  }
+  const repo = JSON.parse(stdout);
 
-  const data = graphql(
+  const data = await graphql(
     `
       query ($owner: String!, $name: String!, $number: Int!) {
         repository(owner: $owner, name: $name) {
@@ -67,13 +78,15 @@ function getPrInfo(prNumber) {
     { owner: repo.owner.login, name: repo.name, number: prNumber },
   );
 
+  const pr = data.repository.pullRequest;
+  if (!pr) {
+    throw new Error(`PR #${prNumber} not found in ${repo.owner.login}/${repo.name}`);
+  }
   return {
     owner: repo.owner.login,
     name: repo.name,
-    prNodeId: data.repository.pullRequest.id,
-    headOid: data.repository.pullRequest.headRefOid,
-    state: data.repository.pullRequest.state,
+    prNodeId: pr.id,
+    headOid: pr.headRefOid,
+    state: pr.state,
   };
 }
-
-module.exports = { graphql, getPrInfo };

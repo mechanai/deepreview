@@ -38,9 +38,10 @@ Task — Use the Task tool with subagent_type="deepreview-review-formatter":
 Wait for it to return.
 
 STEP 4: POST REVIEW
-Run: `PR_HEAD_SHA=$PR_HEAD_SHA node src/post-review.js $SESSION_DIR/threads.md $ARGUMENTS`
+Use the `deepreview-post-review` tool:
 
-If exit code is non-zero, tell the user some threads failed to post and they can re-run the command to retry.
+- `threads_path`: The absolute path to `$SESSION_DIR/threads.md`
+- `pr_number`: $ARGUMENTS (the PR number)
 
 STEP 5: PRESENT RESULTS
 Show the user:

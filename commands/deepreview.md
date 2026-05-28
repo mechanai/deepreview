@@ -36,10 +36,51 @@ Set INPUT_DESCRIPTION based on mode:
 - MODE=branch: "a branch diff against main"
 - MODE=files: "the following files: <list of filenames>"
 
-STEPS 3-5: REVIEW → VALIDATE → SYNTHESIZE
-Follow the shared pipeline defined in `commands/_deepreview-pipeline.md` (Stages 1-3), using the SESSION_DIR and INPUT_DESCRIPTION set above.
+STEP 3: DISPATCH STAGE 1 — INITIAL REVIEW (5 parallel tasks)
+Dispatch ALL FIVE of these Task tool calls simultaneously in a single message:
 
-After Stage 3 completes, record the stats line from the synthesizer's return.
+Task 1 — Use the Task tool with subagent_type="deepreview-correctness":
+"You are reviewing $INPUT_DESCRIPTION. Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-correctness.md."
+
+Task 2 — Use the Task tool with subagent_type="deepreview-security":
+"You are reviewing $INPUT_DESCRIPTION. Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-security.md."
+
+Task 3 — Use the Task tool with subagent_type="deepreview-architecture":
+"You are reviewing $INPUT_DESCRIPTION. Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-architecture.md."
+
+Task 4 — Use the Task tool with subagent_type="deepreview-docs":
+"You are reviewing $INPUT_DESCRIPTION. Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-docs.md."
+
+Task 5 — Use the Task tool with subagent_type="deepreview-compatibility":
+"You are reviewing $INPUT_DESCRIPTION. Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-compatibility.md."
+
+Wait for all 5 to return. Record which succeeded and which failed.
+
+STEP 4: DISPATCH STAGE 2 — CROSS-VALIDATION (5 parallel tasks)
+Only proceed with reviews that exist. Dispatch ALL FIVE simultaneously:
+
+Task 6 — Use the Task tool with subagent_type="deepreview-validator":
+"Your perspective: correctness. Read all review files at: $SESSION_DIR/review-correctness.md, $SESSION_DIR/review-security.md, $SESSION_DIR/review-architecture.md, $SESSION_DIR/review-docs.md, $SESSION_DIR/review-compatibility.md. Write your validated review to $SESSION_DIR/validated-correctness.md."
+
+Task 7 — Use the Task tool with subagent_type="deepreview-validator":
+"Your perspective: security. Read all review files at: $SESSION_DIR/review-correctness.md, $SESSION_DIR/review-security.md, $SESSION_DIR/review-architecture.md, $SESSION_DIR/review-docs.md, $SESSION_DIR/review-compatibility.md. Write your validated review to $SESSION_DIR/validated-security.md."
+
+Task 8 — Use the Task tool with subagent_type="deepreview-validator":
+"Your perspective: architecture. Read all review files at: $SESSION_DIR/review-correctness.md, $SESSION_DIR/review-security.md, $SESSION_DIR/review-architecture.md, $SESSION_DIR/review-docs.md, $SESSION_DIR/review-compatibility.md. Write your validated review to $SESSION_DIR/validated-architecture.md."
+
+Task 9 — Use the Task tool with subagent_type="deepreview-validator":
+"Your perspective: docs. Read all review files at: $SESSION_DIR/review-correctness.md, $SESSION_DIR/review-security.md, $SESSION_DIR/review-architecture.md, $SESSION_DIR/review-docs.md, $SESSION_DIR/review-compatibility.md. Write your validated review to $SESSION_DIR/validated-docs.md."
+
+Task 10 — Use the Task tool with subagent_type="deepreview-validator":
+"Your perspective: compatibility. Read all review files at: $SESSION_DIR/review-correctness.md, $SESSION_DIR/review-security.md, $SESSION_DIR/review-architecture.md, $SESSION_DIR/review-docs.md, $SESSION_DIR/review-compatibility.md. Write your validated review to $SESSION_DIR/validated-compatibility.md."
+
+Wait for all 5 to return.
+
+STEP 5: DISPATCH STAGE 3 — SYNTHESIS (1 task)
+Task 11 — Use the Task tool with subagent_type="deepreview-synthesizer":
+"Read the validated reviews at: $SESSION_DIR/validated-correctness.md, $SESSION_DIR/validated-security.md, $SESSION_DIR/validated-architecture.md, $SESSION_DIR/validated-docs.md, $SESSION_DIR/validated-compatibility.md. Write the synthesis to $SESSION_DIR/synthesis.md."
+
+Record the stats line from its return.
 
 STEP 6: DISPATCH STAGE 4 — IMPLEMENTATION PLAN (1 task)
 Task 12 — Use the Task tool with subagent_type="deepreview-planner":

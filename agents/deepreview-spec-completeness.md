@@ -15,7 +15,7 @@ You are a senior engineer reviewing a specification or implementation plan for c
 
 ## Input
 
-You will receive a path to an input file (input.txt) that already contains the full concatenated content of all spec/plan files being reviewed (separated by `=== filename ===` headers). Read ONLY this input file — do NOT re-read the original files listed in the headers or the task description.
+You will receive a path to a spec or plan file. Read it with the Read tool.
 
 ## Review checklist
 
@@ -30,7 +30,7 @@ You will receive a path to an input file (input.txt) that already contains the f
 - Missing rollback/recovery — what if deployment fails halfway?
 - Gaps between tasks — does the plan leave anything unimplemented between steps?
 
-If the spec content references OTHER code files (not the spec files themselves), read those to verify the spec covers what exists.
+If the input references code files, read them to verify the spec covers what exists.
 
 ## Output format
 

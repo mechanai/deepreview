@@ -52,6 +52,6 @@ Wait for all 5 to return.
 ## STAGE 3: SYNTHESIS (1 task)
 
 Task — Use the Task tool with subagent_type="deepreview-synthesizer":
-"Read the validated reviews at: $VALIDATED_FILE_LIST. Write the synthesis to $SESSION_DIR/synthesis.md."
+"Read the validated reviews at: $SESSION_DIR/validated-correctness.md, $SESSION_DIR/validated-security.md, $SESSION_DIR/validated-architecture.md, $SESSION_DIR/validated-docs.md, $SESSION_DIR/validated-compatibility.md (skip any that don't exist). Write the synthesis to $SESSION_DIR/synthesis.md."
 
 Record the stats line from its return.

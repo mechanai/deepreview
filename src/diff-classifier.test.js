@@ -1,8 +1,6 @@
-"use strict";
-
-const { describe, it } = require("node:test");
-const assert = require("node:assert/strict");
-const { classifyFindings } = require("./diff-classifier.js");
+import { describe, it } from "bun:test";
+import assert from "node:assert/strict";
+import { classifyFindings } from "./diff-classifier.js";
 
 const SAMPLE_DIFF = [
   "diff --git a/pkg/server/handler.go b/pkg/server/handler.go",

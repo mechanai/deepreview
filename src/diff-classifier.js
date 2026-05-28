@@ -1,6 +1,4 @@
-"use strict";
-
-const parseDiff = require("parse-diff");
+import parseDiff from "parse-diff";
 
 /**
  * Classify findings into placement tiers based on the PR diff.
@@ -53,4 +51,4 @@ function buildFileMap(parsedDiff) {
   return map;
 }
 
-module.exports = { classifyFindings };
+export { classifyFindings };

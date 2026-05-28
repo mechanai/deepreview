@@ -1,8 +1,6 @@
-"use strict";
-
-const { describe, it } = require("node:test");
-const assert = require("node:assert/strict");
-const { parseThreads } = require("./parse-threads.js");
+import { describe, it } from "bun:test";
+import assert from "node:assert/strict";
+import { parseThreads } from "./parse-threads.js";
 
 describe("parseThreads", () => {
   it("parses a single finding", () => {
