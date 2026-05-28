@@ -12,8 +12,10 @@ export const server: Plugin = async (_input: PluginInput) => {
           "tiers based on the PR diff, and submits via GitHub GraphQL API. " +
           "Returns a summary of what was posted.",
         args: {
-          threads_path: tool.schema.string().describe("Absolute path to the threads.md file"),
-          pr_number: tool.schema.number().describe("Pull request number"),
+          threads_path: tool.schema
+            .string()
+            .describe("Relative path to the threads.md file (from workspace root)"),
+          pr_number: tool.schema.number().int().positive().describe("Pull request number"),
           dry_run: tool.schema
             .boolean()
             .optional()

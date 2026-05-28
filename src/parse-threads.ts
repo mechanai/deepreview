@@ -27,7 +27,12 @@ function parseThreads(content: string): Finding[] {
     const data = parsed.data as Record<string, unknown>;
     const path = data.path as string | undefined;
     const lineNum = Number(data.line);
-    if (path === null || path === undefined || path === "" || !Number.isFinite(lineNum)) continue;
+    if (path === null || path === undefined || path === "" || !Number.isFinite(lineNum)) {
+      if (path !== null && path !== undefined && path !== "") {
+        console.warn(`WARN: Skipping finding with invalid line number in ${path}`);
+      }
+      continue;
+    }
 
     const startLineNum =
       data.startLine !== null && data.startLine !== undefined ? Number(data.startLine) : undefined;

@@ -20,7 +20,11 @@ function execFileWithInput(
       }
       resolve(typeof stdout === "string" ? stdout : stdout.toString());
     });
-    child.stdin?.end(opts.input);
+    if (!child.stdin) {
+      reject(new Error("execFileWithInput: child process has no stdin"));
+      return;
+    }
+    child.stdin.end(opts.input);
   });
 }
 const TIMEOUT_MS = 30_000;
@@ -76,7 +80,10 @@ export async function graphql<T = unknown>(
     const msg = parsed.errors.map((e) => e.message).join("; ");
     throw new GraphQLResponseError(`GraphQL error: ${msg}`, parsed.errors);
   }
-  return parsed.data as T;
+  if (parsed.data === undefined || parsed.data === null) {
+    throw new Error("GraphQL response contained no data");
+  }
+  return parsed.data;
 }
 
 export interface PrInfo {
@@ -119,7 +126,14 @@ export async function getPrInfo(prNumber: number, { cwd }: { cwd?: string } = {}
       `Failed to query repository info via \`gh\`. Ensure \`gh auth login\` is complete.\n${message}`,
     );
   }
-  const repo = JSON.parse(stdout) as RepoViewResponse;
+  let repo: RepoViewResponse;
+  try {
+    repo = JSON.parse(stdout) as RepoViewResponse;
+  } catch {
+    throw new Error(
+      `Failed to parse \`gh repo view\` output as JSON. Got:\n${stdout.slice(0, 200)}`,
+    );
+  }
 
   const data = await graphql<PrQueryResponse>(
     `

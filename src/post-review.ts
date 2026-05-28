@@ -35,6 +35,7 @@ export interface PostReviewOptions {
   skipIds?: string[];
   expectedSha?: string;
   cwd?: string;
+  diffText?: string;
 }
 
 export interface PostReviewResult {
@@ -57,7 +58,8 @@ function buildReviewBody(
       continue;
     }
     const permalink = `https://github.com/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/blob/${headOid}/${encodeURI(f.path)}#L${f.line}`;
-    const safeBody = f.body.replaceAll(/<([a-z][a-z0-9]*)/giu, "&lt;$1");
+    // Neutralize all HTML tags — GitHub re-renders markdown inside <details>.
+    const safeBody = f.body.replaceAll(/</gu, "&lt;");
     body += `<details>\n<summary><a href="${permalink}"><code>${escapeHtml(f.path)}:${f.line}</code></a></summary>\n\n${safeBody}\n</details>\n\n`;
   }
   body += AI_TRAILER;
@@ -150,6 +152,7 @@ async function postInlineThreads(
   );
 
   for (let i = 0; i < pending.length; i += CONCURRENCY) {
+    if (i > 0) await sleepMs(200);
     const batch = pending.slice(i, i + CONCURRENCY);
     const results = await Promise.all(
       batch.map(async (f) => {
@@ -272,9 +275,11 @@ async function postFindings(
   });
 
   const failedIds = await postInlineThreads(reviewId, inlineFindings, updatedFindings);
-  const skipped = inlineFindings.filter((f) =>
-    updatedFindings.has(findingId(f.path, f.startLine, f.line, f.body)),
-  ).length;
+  const skipped =
+    inlineFindings.length -
+    inlineFindings.filter(
+      (f) => !updatedFindings.has(findingId(f.path, f.startLine, f.line, f.body)),
+    ).length;
   const posted = inlineFindings.length - skipped - failedIds.length;
   const summary =
     `Posted ${posted}/${inlineFindings.length} inline threads (${skipped} up-to-date, ${failedIds.length} failed). ` +
@@ -295,12 +300,16 @@ export async function postReview(opts: PostReviewOptions): Promise<PostReviewRes
   if (!result) return { summary: "No findings to post.", failed: [] };
 
   const { findings, prInfo } = result;
-  const { stdout: diff } = await execFileAsync("gh", ["pr", "diff", String(prNumber)], {
-    encoding: "utf8",
-    maxBuffer: 10 * 1024 * 1024,
-    signal: AbortSignal.timeout(30_000),
-    cwd: opts.cwd,
-  });
+  const diff =
+    opts.diffText ??
+    (
+      await execFileAsync("gh", ["pr", "diff", String(prNumber)], {
+        encoding: "utf8",
+        maxBuffer: 10 * 1024 * 1024,
+        signal: AbortSignal.timeout(30_000),
+        cwd: opts.cwd,
+      })
+    ).stdout;
   const { tier1, tier2, tier3 } = classifyAndLog(findings, diff);
 
   if (dryRun) {

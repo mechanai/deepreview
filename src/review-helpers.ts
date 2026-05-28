@@ -13,11 +13,13 @@ export function escapeHtml(s: string): string {
 
 export function isValidPath(filePath: string): boolean {
   if (filePath.startsWith("/") || filePath.includes("..")) return false;
+  if (filePath === "") return false;
+  // Normalize away harmless . and trailing slashes before comparison
   const normalized = filePath
     .split("/")
     .filter((s) => s !== "." && s !== "")
     .join("/");
-  return normalized === filePath;
+  return normalized.length > 0;
 }
 
 export function sleepMs(ms: number): Promise<void> {

@@ -7,9 +7,9 @@ description: "Shared pipeline stages for deepreview commands (review → validat
 
 This template defines 3 stages used by deepreview orchestrator commands. The orchestrator must set SESSION_DIR and INPUT_DESCRIPTION before invoking these stages.
 
-## STAGE 1: INITIAL REVIEW (5 parallel tasks)
+## STAGE 1: INITIAL REVIEW (one task per review perspective)
 
-Dispatch ALL FIVE of these Task tool calls simultaneously in a single message:
+Dispatch ALL of these Task tool calls simultaneously in a single message:
 
 Task — Use the Task tool with subagent_type="deepreview-correctness":
 "You are reviewing $INPUT_DESCRIPTION. Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-correctness.md."
