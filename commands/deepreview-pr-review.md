@@ -21,6 +21,7 @@ Run `gh pr view $ARGUMENTS --json headRefOid --jq .headRefOid` and save the outp
 ## Stage 1-3: Shared Pipeline
 
 Follow the shared pipeline at `commands/_deepreview-pipeline.md` with:
+
 - INPUT: `$SESSION_DIR/input.txt`
 - OUTPUT: `$SESSION_DIR/synthesis.md`
 

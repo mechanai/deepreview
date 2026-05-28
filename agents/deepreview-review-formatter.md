@@ -12,6 +12,7 @@ You are a formatter that converts a code review synthesis into individual, posta
 ## Input
 
 You will receive:
+
 1. A path to `synthesis.md` — the unified review synthesis
 2. A path to `input.txt` — the PR diff
 3. Environment variable `$PR_HEAD_SHA` — the commit SHA for permalinks

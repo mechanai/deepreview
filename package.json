@@ -16,13 +16,13 @@
   "publishConfig": {
     "access": "public"
   },
+  "dependencies": {
+    "gray-matter": "4.0.3",
+    "parse-diff": "0.11.1"
+  },
   "devDependencies": {
     "oxfmt": "0.52.0",
     "oxlint": "1.67.0"
   },
-  "packageManager": "yarn@4.15.0",
-  "dependencies": {
-    "gray-matter": "4.0.3",
-    "parse-diff": "0.11.1"
-  }
+  "packageManager": "yarn@4.15.0"
 }
