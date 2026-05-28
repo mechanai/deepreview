@@ -61,10 +61,8 @@ function splitDocuments(content) {
         current = [line];
         inFrontmatter = true;
       }
-    } else {
-      if (foundFirstDoc) {
-        current.push(line);
-      }
+    } else if (foundFirstDoc) {
+      current.push(line);
     }
   }
 
