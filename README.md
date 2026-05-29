@@ -31,25 +31,23 @@ review content into its own context, keeping token usage minimal.
 
 ## Install
 
-```bash
-npx @mechanai/deepreview@latest install
-```
-
-This copies agent and command files into `~/.config/opencode/` and adds `.ai/deepreview/`
-to the local `.gitignore` (where review output is written). Run it again after updating
-the package to sync changes.
-
-To add the gitignore entry to your global gitignore instead:
+Add the plugin to your project:
 
 ```bash
-npx @mechanai/deepreview@latest install --gitignore-global
+bun add -D @mechanai/deepreview
 ```
 
-To remove:
+Then register it in your `opencode.json`:
 
-```bash
-npx @mechanai/deepreview@latest uninstall
+```jsonc
+{
+  "plugins": {
+    "deepreview": "@mechanai/deepreview/plugin"
+  }
+}
 ```
+
+OpenCode auto-discovers the agents and commands from the package.
 
 ## Usage
 
@@ -86,6 +84,7 @@ to apply the fixes.
 ## Requirements
 
 - [OpenCode](https://opencode.ai)
+- [Bun](https://bun.sh) >= 1.2.0
 - `git` (for diffs)
 - `gh` CLI (only if reviewing PRs by number)
 
@@ -113,11 +112,11 @@ to apply the fixes.
 
 ## Output
 
-All review artifacts are saved to `.ai/deepreview/<branch-or-PR>-<date>/`:
+All review artifacts are saved to `.ai/reviews/<session>/`:
 
 ```
-.ai/deepreview/feature-xyz-2025-05-10/
-├── diff.txt
+.ai/reviews/feature-xyz-2025-05-10/
+├── input.txt
 ├── review-correctness.md
 ├── review-security.md
 ├── review-architecture.md
@@ -130,6 +129,15 @@ All review artifacts are saved to `.ai/deepreview/<branch-or-PR>-<date>/`:
 ├── validated-compatibility.md
 ├── synthesis.md
 └── implementation-plan.md
+```
+
+## Development
+
+```bash
+bun install
+mise run test    # Run tests
+mise run lint    # Lint (includes type-aware oxlint)
+mise run fmt     # Format
 ```
 
 ## License
