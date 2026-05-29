@@ -6,15 +6,21 @@ implementation plan.
 
 ## Install
 
-Add to your `opencode.json` (project-level or global):
+Run the setup script:
 
-```jsonc
-{
-  "plugin": ["@mechanai/deepreview"],
-}
+```bash
+bunx @mechanai/deepreview@latest/setup          # Global install (~/.config/opencode/)
+bunx @mechanai/deepreview@latest/setup --local   # Project-level install (.opencode/)
 ```
 
-OpenCode installs the package automatically at startup.
+This will:
+
+1. Add `@mechanai/deepreview` to the `plugin` array in your `opencode.json` (creates the file if needed)
+2. Symlink agents and commands into the appropriate config directory
+
+> [!NOTE]
+> The symlinks are needed because OpenCode does not yet auto-discover
+> agents and commands from installed plugin packages.
 
 ## Usage
 
@@ -67,7 +73,10 @@ its own context, keeping token usage minimal.
 
 > [!NOTE]
 > If upgrading from the old `npx @anthropic/deepreview install` workflow, remove
-> `~/.config/opencode/agents/deepreview*` files — they are no longer used.
+> the old copied files first (`rm ~/.config/opencode/agents/deepreview*
+~/.config/opencode/commands/deepreview*`), then run the setup script above.
+> The setup script uses symlinks instead of copies, so future upgrades only
+> require re-running the script.
 
 ## Development
 

@@ -15,7 +15,8 @@
   "main": "./.opencode/plugins/deepreview.ts",
   "exports": {
     ".": "./.opencode/plugins/deepreview.ts",
-    "./api": "./src/post-review.ts"
+    "./api": "./src/post-review.ts",
+    "./setup": "./src/setup.ts"
   },
   "publishConfig": {
     "access": "public"
@@ -23,6 +24,7 @@
   "dependencies": {
     "gray-matter": "4.0.3",
     "js-yaml": "4.1.0",
+    "jsonc-parser": "3.3.1",
     "parse-diff": "0.11.1"
   },
   "devDependencies": {
