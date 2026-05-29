@@ -13,6 +13,8 @@ bunx @mechanai/deepreview@latest/setup          # Global install (~/.config/open
 bunx @mechanai/deepreview@latest/setup --local   # Project-level install (.opencode/)
 ```
 
+Alternatively, add `"@mechanai/deepreview"` to the `plugin` array in your `opencode.json` manually — the setup script simply automates this plus symlink creation.
+
 This will:
 
 1. Add `@mechanai/deepreview` to the `plugin` array in your `opencode.json` (creates the file if needed)

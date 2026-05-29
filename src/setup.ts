@@ -72,6 +72,7 @@ function ensurePluginInConfig() {
   } catch {
     console.error(`Could not parse ${configPath}. Add the plugin manually:`);
     console.error(`  "plugin": ["${PACKAGE_NAME}"]`);
+    process.exitCode = 1;
     return;
   }
 
@@ -110,18 +111,26 @@ function symlinkDirectory(kind: "agents" | "commands") {
       if (lstatSync(dest).isSymbolicLink() && !sourceFiles.has(file)) {
         unlinkSync(dest);
       }
-    } catch {
-      // ignore
+    } catch (err: unknown) {
+      const code =
+        err instanceof Error && "code" in err ? (err as { code: unknown }).code : undefined;
+      if (err instanceof Error && code !== "ENOENT") {
+        console.warn(`Could not check ${dest}: ${err.message}`);
+      }
     }
   }
 
   for (const file of sourceFiles) {
     const dest = path.join(destDir, file);
-    const source = path.relative(destDir, path.join(sourceDir, file));
+    const source = path.join(sourceDir, file);
 
     try {
       // Use lstatSync to detect both regular files and dangling symlinks
-      lstatSync(dest);
+      const stat = lstatSync(dest);
+      if (!stat.isSymbolicLink()) {
+        console.warn(`Skipping ${dest}: not a symlink (would overwrite regular file)`);
+        continue;
+      }
       unlinkSync(dest);
     } catch {
       // File doesn't exist, proceed
