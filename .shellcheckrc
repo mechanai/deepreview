@@ -1,0 +1,6 @@
+shell=bash
+external-sources=true
+source-path=SCRIPTDIR
+
+deprecate-which=true
+require-double-brackets=true
