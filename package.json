@@ -14,10 +14,10 @@
     ".opencode/"
   ],
   "type": "module",
-  "main": "./src/post-review.ts",
+  "main": "./.opencode/plugins/deepreview.ts",
   "exports": {
-    ".": "./src/post-review.ts",
-    "./plugin": "./.opencode/plugins/deepreview.ts"
+    ".": "./.opencode/plugins/deepreview.ts",
+    "./api": "./src/post-review.ts"
   },
   "publishConfig": {
     "access": "public"

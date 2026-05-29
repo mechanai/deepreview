@@ -31,23 +31,16 @@ review content into its own context, keeping token usage minimal.
 
 ## Install
 
-Add the plugin to your project:
-
-```bash
-bun add -D @mechanai/deepreview
-```
-
-Then register it in your `opencode.json`:
+Add to your `opencode.json` (project-level or global):
 
 ```jsonc
 {
-  "plugins": {
-    "deepreview": "@mechanai/deepreview/plugin"
-  }
+  "plugin": ["@mechanai/deepreview"]
 }
 ```
 
-OpenCode auto-discovers the agents and commands from the package.
+OpenCode installs the package automatically at startup and auto-discovers the agents and
+commands.
 
 ## Usage
 
@@ -84,7 +77,6 @@ to apply the fixes.
 ## Requirements
 
 - [OpenCode](https://opencode.ai)
-- [Bun](https://bun.sh) >= 1.2.0
 - `git` (for diffs)
 - `gh` CLI (only if reviewing PRs by number)
 
