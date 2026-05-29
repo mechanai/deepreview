@@ -9,8 +9,6 @@
   },
   "files": [
     "src/",
-    "agents/",
-    "commands/",
     ".opencode/"
   ],
   "type": "module",
