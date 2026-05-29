@@ -15,7 +15,6 @@ import {
   lstatSync,
   mkdirSync,
   readdirSync,
-  readlinkSync,
   symlinkSync,
   unlinkSync,
   readFileSync,
@@ -99,7 +98,7 @@ function symlinkDirectory(kind: "agents" | "commands") {
 
   // Remove stale deepreview symlinks that no longer exist in the package
   for (const file of readdirSync(destDir)) {
-    if (!file.startsWith("deepreview-")) continue;
+    if (!file.includes("deepreview")) continue;
     const dest = path.join(destDir, file);
     try {
       if (lstatSync(dest).isSymbolicLink() && !sourceFiles.has(file)) {
@@ -114,8 +113,12 @@ function symlinkDirectory(kind: "agents" | "commands") {
     const dest = path.join(destDir, file);
     const source = path.relative(destDir, path.join(sourceDir, file));
 
-    if (existsSync(dest)) {
+    try {
+      // Use lstatSync to detect both regular files and dangling symlinks
+      lstatSync(dest);
       unlinkSync(dest);
+    } catch {
+      // File doesn't exist, proceed
     }
     symlinkSync(source, dest);
     created++;
