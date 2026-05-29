@@ -2,10 +2,13 @@ import { type ExecFileOptions, execFile } from "node:child_process";
 import { promisify } from "node:util";
 
 // oxlint-disable-next-line typescript/strict-void-return -- Why: promisify() overload resolution picks void-returning signature incorrectly
-const execFileAsync = promisify(execFile);
+export const execFileAsync = promisify(execFile);
 
-/** execFile with stdin input support (typed correctly) */
-function execFileWithInput(
+/**
+ * Spawn a child process via execFile, writing `opts.input` to stdin.
+ * Resolves with stdout on success; rejects with an Error that has a `stderr` property on failure.
+ */
+async function execFileWithInput(
   cmd: string,
   args: string[],
   opts: ExecFileOptions & { input: string },
@@ -18,12 +21,20 @@ function execFileWithInput(
         reject(e);
         return;
       }
+      const stderrStr = typeof stderr === "string" ? stderr : stderr.toString();
+      if (stderrStr.trim()) console.warn(`[gh stderr] ${stderrStr.trim()}`);
       resolve(typeof stdout === "string" ? stdout : stdout.toString());
     });
     if (!child.stdin) {
+      child.kill();
       reject(new Error("execFileWithInput: child process has no stdin"));
       return;
     }
+    child.stdin.on("error", (err: NodeJS.ErrnoException) => {
+      if (err.code !== "EPIPE") {
+        console.error(`[graphql] stdin error: ${err.message}`);
+      }
+    });
     child.stdin.end(opts.input);
   });
 }
@@ -64,14 +75,21 @@ export async function graphql<T = unknown>(
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
   } catch (err: unknown) {
-    const e = err as { stderr?: Buffer | string; message?: string };
-    const stderr = e.stderr === undefined ? "" : String(e.stderr).trim();
-    const detail = stderr === "" ? (e.message ?? "unknown error") : stderr;
+    const stderr =
+      err !== null && typeof err === "object" && "stderr" in err
+        ? String((err as { stderr: unknown }).stderr).trim()
+        : "";
+    const message =
+      err !== null && typeof err === "object" && "message" in err
+        ? String((err as { message: unknown }).message)
+        : "unknown error";
+    const detail = stderr === "" ? message : stderr;
     throw new Error(`gh graphql failed: ${detail}`);
   }
 
   let parsed: GraphQLResponse<T>;
   try {
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Why: JSON.parse returns any; structural validation follows
     parsed = JSON.parse(result) as GraphQLResponse<T>;
   } catch {
     throw new Error(`gh graphql returned non-JSON: ${result.slice(0, 200)}`);
@@ -128,6 +146,7 @@ export async function getPrInfo(prNumber: number, { cwd }: { cwd?: string } = {}
   }
   let repo: RepoViewResponse;
   try {
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Why: JSON.parse returns any; parse failure caught below
     repo = JSON.parse(stdout) as RepoViewResponse;
   } catch {
     throw new Error(

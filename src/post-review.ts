@@ -1,11 +1,9 @@
 import { readFile, realpath } from "node:fs/promises";
 import { resolve } from "node:path";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import { parseThreads } from "./parse-threads.ts";
 import { classifyFindings } from "./diff-classifier.ts";
 import type { Finding, ClassifiedFinding } from "./diff-classifier.ts";
-import { type PrInfo, getPrInfo } from "./graphql.ts";
+import { type PrInfo, getPrInfo, execFileAsync } from "./graphql.ts";
 import {
   type PendingReview,
   findPendingReview,
@@ -18,15 +16,11 @@ import {
 import {
   escapeHtml,
   isValidPath,
-  sleepMs,
   isRateLimitError,
   findingId,
   embedFindingId,
   extractFindingId,
 } from "./review-helpers.ts";
-
-// oxlint-disable-next-line typescript/strict-void-return -- Why: promisify() overload resolution picks void-returning signature incorrectly
-const execFileAsync = promisify(execFile);
 
 export interface PostReviewOptions {
   threadsPath: string;
@@ -57,10 +51,9 @@ function buildReviewBody(
       console.warn(`WARN: Skipping finding with suspicious path: ${f.path}`);
       continue;
     }
-    const permalink = `https://github.com/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/blob/${headOid}/${encodeURI(f.path)}#L${f.line}`;
+    const permalink = `https://github.com/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/blob/${headOid}/${f.path.split("/").map(encodeURIComponent).join("/")}#L${f.line}`;
     // Neutralize all HTML tags — GitHub re-renders markdown inside <details>.
-    const safeBody = f.body.replaceAll(/</gu, "&lt;");
-    body += `<details>\n<summary><a href="${permalink}"><code>${escapeHtml(f.path)}:${f.line}</code></a></summary>\n\n${safeBody}\n</details>\n\n`;
+    body += `<details>\n<summary><a href="${permalink}"><code>${escapeHtml(f.path)}:${f.line}</code></a></summary>\n\n${f.body}\n</details>\n\n`;
   }
   body += AI_TRAILER;
   return body;
@@ -125,13 +118,15 @@ async function postWithRetry(
       console.warn(
         `Rate limited on ${finding.path}:${finding.line}. Waiting 60s (retry ${attempt + 1}/2)...`,
       );
-      await sleepMs(60_000);
+      await Bun.sleep(60_000 + Math.floor(Math.random() * 10_000));
       try {
         await postThread(reviewId, finding, body);
         return true;
       } catch (retryErr: unknown) {
         if (!isRateLimitError(retryErr)) {
-          throw retryErr;
+          const message = retryErr instanceof Error ? retryErr.message : String(retryErr);
+          console.error(`FAIL: ${finding.path}:${finding.line} — ${message}`);
+          return false;
         }
       }
     }
@@ -145,18 +140,19 @@ async function postInlineThreads(
   inlineFindings: ClassifiedFinding[],
   updatedIds: Set<string>,
 ): Promise<string[]> {
-  const CONCURRENCY = 5;
+  const CONCURRENCY = 2;
   const failedFindings: string[] = [];
   const pending = inlineFindings.filter(
     (f) => !updatedIds.has(findingId(f.path, f.startLine, f.line, f.body)),
   );
 
   for (let i = 0; i < pending.length; i += CONCURRENCY) {
-    if (i > 0) await sleepMs(200);
+    if (i > 0) await Bun.sleep(1000);
     const batch = pending.slice(i, i + CONCURRENCY);
     const results = await Promise.all(
       batch.map(async (f) => {
         const id = findingId(f.path, f.startLine, f.line, f.body);
+        // Trust boundary: body content is rendered by GitHub's Markdown sanitizer
         const body = embedFindingId(f.body, id);
         const ok = await postWithRetry(reviewId, f, body);
         return ok ? null : id;
@@ -229,7 +225,13 @@ async function loadAndValidatePr(
     throw new Error(`Invalid threadsPath: ${threadsPath}`);
   }
   const base = await realpath(resolve(cwd ?? process.cwd()));
-  const resolved = await realpath(resolve(base, threadsPath));
+  const candidatePath = resolve(base, threadsPath);
+  let resolved: string;
+  try {
+    resolved = await realpath(candidatePath);
+  } catch {
+    throw new Error(`Threads file not found: ${candidatePath}`);
+  }
   if (!resolved.startsWith(base + "/") && resolved !== base) {
     throw new Error(`threadsPath escapes working directory: ${threadsPath}`);
   }
@@ -275,14 +277,14 @@ async function postFindings(
   });
 
   const failedIds = await postInlineThreads(reviewId, inlineFindings, updatedFindings);
-  const skipped =
-    inlineFindings.length -
-    inlineFindings.filter(
-      (f) => !updatedFindings.has(findingId(f.path, f.startLine, f.line, f.body)),
-    ).length;
+  const skipped = inlineFindings.filter((f) =>
+    updatedFindings.has(findingId(f.path, f.startLine, f.line, f.body)),
+  ).length;
   const posted = inlineFindings.length - skipped - failedIds.length;
+  const totalFindings = [...tier1, ...tier2].length;
+  const skippedByUser = totalFindings - inlineFindings.length;
   const summary =
-    `Posted ${posted}/${inlineFindings.length} inline threads (${skipped} up-to-date, ${failedIds.length} failed). ` +
+    `Posted ${posted}/${totalFindings} inline threads (${skipped} up-to-date, ${skippedByUser} skipped, ${failedIds.length} failed). ` +
     `${tier3.length} findings in review body.`;
 
   console.log(summary);

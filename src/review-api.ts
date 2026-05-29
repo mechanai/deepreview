@@ -93,6 +93,9 @@ async function fetchRemainingComments(
     comments.push(...next.nodes);
     pageInfo = next.pageInfo;
   }
+  if (pages >= MAX_PAGES) {
+    console.warn(`WARN: Reached MAX_PAGES (${MAX_PAGES}) — review data may be incomplete.`);
+  }
   return comments;
 }
 
@@ -194,7 +197,7 @@ export async function addLineThread(
     side: "RIGHT",
     body,
   };
-  if (startLine !== undefined && startLine > 0) {
+  if (startLine !== undefined && startLine > 0 && startLine < line) {
     input.startLine = startLine;
     input.startSide = "RIGHT";
   }

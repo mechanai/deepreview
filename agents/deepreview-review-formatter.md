@@ -53,7 +53,7 @@ line: <line number>
   - Get OWNER/REPO from the diff header or from `input.txt` context
 - Use ` ```suggestion ` blocks where a concrete fix is obvious
 - American English. Succinct. No filler.
-- Do NOT classify findings into tiers — the posting script handles placement
+- Do NOT classify findings into tiers — the posting pipeline handles placement
 
 ## Line number rules
 

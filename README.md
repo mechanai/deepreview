@@ -10,7 +10,7 @@ Add to your `opencode.json` (project-level or global):
 
 ```jsonc
 {
-  "plugin": ["@mechanai/deepreview"]
+  "plugin": ["@mechanai/deepreview"],
 }
 ```
 
@@ -33,7 +33,7 @@ OpenCode installs the package automatically at startup.
 ```
 
 All commands accept a branch diff, PR number, or file path(s). The `-loop` variants
-apply fixes automatically and re-review until no findings remain. Pauses on deadlocks
+apply fixes automatically and re-review until no findings remain. Pauses on plateaus
 (same finding persists across iterations).
 
 ## Pipeline
@@ -51,13 +51,13 @@ its own context, keeping token usage minimal.
 
 ### Review agents
 
-| Agent | Code review | Spec review |
-| --- | --- | --- |
-| correctness / completeness | Logic bugs, edge cases, error handling | Gaps, missing edge cases, undefined behavior |
-| security / consistency | Vulnerabilities, performance | Contradictions, name mismatches, type drift |
-| architecture | Patterns, coupling, complexity | Patterns, coupling, complexity |
-| docs | Comment quality, stale claims | Comment quality, stale claims |
-| compatibility / feasibility | Breaking changes, API contracts | Implicit dependencies, can it be built |
+| Agent                       | Code review                            | Spec review                                  |
+| --------------------------- | -------------------------------------- | -------------------------------------------- |
+| correctness / completeness  | Logic bugs, edge cases, error handling | Gaps, missing edge cases, undefined behavior |
+| security / consistency      | Vulnerabilities, performance           | Contradictions, name mismatches, type drift  |
+| architecture                | Patterns, coupling, complexity         | Patterns, coupling, complexity               |
+| docs                        | Comment quality, stale claims          | Comment quality, stale claims                |
+| compatibility / feasibility | Breaking changes, API contracts        | Implicit dependencies, can it be built       |
 
 ## Requirements
 
@@ -65,7 +65,13 @@ its own context, keeping token usage minimal.
 - `git`
 - `gh` CLI (only for PR commands)
 
+> [!NOTE]
+> If upgrading from the old `npx @anthropic/deepreview install` workflow, remove
+> `~/.config/opencode/agents/deepreview*` files — they are no longer used.
+
 ## Development
+
+This project uses [Bun](https://bun.sh/) as its runtime and package manager.
 
 ```bash
 bun install

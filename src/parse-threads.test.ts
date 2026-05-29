@@ -50,4 +50,9 @@ describe("parseThreads", () => {
     const result = parseThreads(input);
     assert.equal(result[0].startLine, undefined);
   });
+
+  it("returns empty array for empty input", () => {
+    const result = parseThreads("");
+    assert.equal(result.length, 0);
+  });
 });

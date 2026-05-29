@@ -2,9 +2,17 @@ import matter from "gray-matter";
 import yaml from "js-yaml";
 import type { Finding } from "./diff-classifier.ts";
 
-/** gray-matter engine restricted to safe YAML parsing (no !!js/function etc.) */
-const safeYamlEngine = (s: string): Record<string, unknown> =>
-  (yaml.load(s, { schema: yaml.FAILSAFE_SCHEMA }) as Record<string, unknown>) ?? {};
+/**
+ * gray-matter engine restricted to safe YAML parsing (no !!js/function etc.).
+ * FAILSAFE_SCHEMA returns all scalars as strings — numeric fields (line, startLine)
+ * are coerced to number downstream in parseThreads. This is intentional.
+ */
+const safeYamlEngine = (s: string): Record<string, unknown> => {
+  const result: unknown = yaml.load(s, { schema: yaml.FAILSAFE_SCHEMA });
+  if (result === null || result === undefined || typeof result !== "object") return {};
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Why: narrowed to object via typeof guard above; FAILSAFE_SCHEMA always yields a plain object
+  return result as Record<string, unknown>;
+};
 const matterOptions = { engines: { yaml: safeYamlEngine } };
 
 /**
@@ -25,17 +33,18 @@ function parseThreads(content: string): Finding[] {
       continue;
     }
     const data = parsed.data as Record<string, unknown>;
-    const path = data.path as string | undefined;
+    const path = typeof data.path === "string" ? data.path : undefined;
     const lineNum = Number(data.line);
-    if (path === null || path === undefined || path === "" || !Number.isFinite(lineNum)) {
-      if (path !== null && path !== undefined && path !== "") {
+    if (path === undefined || path === "" || !Number.isFinite(lineNum) || lineNum < 1) {
+      if (path !== undefined && path !== "") {
         console.warn(`WARN: Skipping finding with invalid line number in ${path}`);
       }
       continue;
     }
 
+    const rawStartLine: unknown = data.startLine;
     const startLineNum =
-      data.startLine !== null && data.startLine !== undefined ? Number(data.startLine) : undefined;
+      rawStartLine !== null && rawStartLine !== undefined ? Number(rawStartLine) : undefined;
     findings.push({
       path,
       line: lineNum,

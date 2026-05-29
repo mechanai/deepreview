@@ -22,7 +22,7 @@ interface FileHunks {
  * Tier 2: file-level (file in diff but line not in any hunk)
  * Tier 3: review body (file not in diff)
  */
-function classifyFindings(findings: Finding[], diffText: string): ClassifiedFinding[] {
+export function classifyFindings(findings: Finding[], diffText: string): ClassifiedFinding[] {
   const parsed = parseDiff(diffText);
   const fileMap = buildFileMap(parsed);
 
@@ -50,7 +50,7 @@ function buildFileMap(parsedDiff: parseDiff.File[]): Map<string, FileHunks> {
   const map = new Map<string, FileHunks>();
   for (const file of parsedDiff) {
     const filePath = file.to === "/dev/null" ? file.from : file.to;
-    if (filePath === null || filePath === undefined || filePath === "") continue;
+    if (filePath === undefined || filePath === "") continue;
 
     const hunks = file.chunks.map((chunk) => ({
       newStart: chunk.newStart,
@@ -61,5 +61,3 @@ function buildFileMap(parsedDiff: parseDiff.File[]): Map<string, FileHunks> {
   }
   return map;
 }
-
-export { classifyFindings };

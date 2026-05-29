@@ -12,6 +12,7 @@ export function escapeHtml(s: string): string {
 }
 
 export function isValidPath(filePath: string): boolean {
+  if (filePath.includes("\0")) return false;
   if (filePath.startsWith("/") || filePath.includes("..")) return false;
   if (filePath === "") return false;
   // Normalize away harmless . and trailing slashes before comparison
@@ -22,12 +23,6 @@ export function isValidPath(filePath: string): boolean {
   return normalized.length > 0;
 }
 
-export function sleepMs(ms: number): Promise<void> {
-  return new Promise((r) => {
-    setTimeout(r, ms);
-  });
-}
-
 export interface RateLimitLike {
   status?: number;
   type?: string;
@@ -35,11 +30,19 @@ export interface RateLimitLike {
 }
 
 export function isRateLimitError(err: unknown): boolean {
-  const e = err as RateLimitLike;
-  if (e.status === 429 || e.status === 403) return true;
-  if (e.type === "RATE_LIMITED") return true;
-  const msg = e.message?.toLowerCase() ?? "";
-  return msg.includes("rate limit") || msg.includes("secondary rate limit");
+  if (err === null || typeof err !== "object") return false;
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Why: narrowed to object via typeof guard; property access checked individually below
+  const e = err as Record<string, unknown>;
+  const status = typeof e.status === "number" ? e.status : undefined;
+  const type = typeof e.type === "string" ? e.type : undefined;
+  const message = typeof e.message === "string" ? e.message.toLowerCase() : "";
+
+  if (status === 429) return true;
+  if (status === 403) {
+    return message.includes("rate limit") || message.includes("secondary rate limit");
+  }
+  if (type === "RATE_LIMITED") return true;
+  return message.includes("rate limit") || message.includes("secondary rate limit");
 }
 
 export function findingId(
@@ -57,6 +60,6 @@ export function embedFindingId(body: string, id: string): string {
 }
 
 export function extractFindingId(body: string): string | null {
-  const match = body.match(FINDING_ID_RE);
+  const match = FINDING_ID_RE.exec(body);
   return match ? match[1] : null;
 }
