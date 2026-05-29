@@ -50,7 +50,7 @@ function ensurePluginInConfig() {
     }
   }
 
-  if (!configPath) {
+  if (configPath === undefined) {
     configPath = path.join(searchDir, "opencode.json");
     mkdirSync(searchDir, { recursive: true });
     writeFileSync(configPath, JSON.stringify({ plugin: [PACKAGE_NAME] }, null, 2) + "\n");
@@ -63,14 +63,20 @@ function ensurePluginInConfig() {
   // Check if plugin is already registered
   let config: Record<string, unknown>;
   try {
-    config = parseJsonc(raw) as Record<string, unknown>;
+    const parsed: unknown = parseJsonc(raw);
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error("not an object");
+    }
+    // oxlint-disable-next-line no-unsafe-type-assertion -- Why: validated above with type guards
+    config = parsed as Record<string, unknown>;
   } catch {
     console.error(`Could not parse ${configPath}. Add the plugin manually:`);
     console.error(`  "plugin": ["${PACKAGE_NAME}"]`);
     return;
   }
 
-  const plugins = Array.isArray(config.plugin) ? (config.plugin as string[]) : [];
+  const pluginArray = Array.isArray(config.plugin) ? config.plugin : [];
+  const plugins = pluginArray.filter((p): p is string => typeof p === "string");
   if (plugins.includes(PACKAGE_NAME)) {
     console.log(`Plugin already registered in ${configPath}.`);
     return;

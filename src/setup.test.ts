@@ -28,7 +28,15 @@ function run(cwd: string, args: string[] = []) {
   });
 }
 
-describe("setup script", () => {
+function readConfig(filePath: string): { plugin?: unknown } {
+  const parsed: unknown = JSON.parse(readFileSync(filePath, "utf-8"));
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("config is not an object");
+  }
+  return parsed as { plugin?: unknown };
+}
+
+describe("setup script - config", () => {
   let tempDir: string;
 
   beforeEach(() => {
@@ -46,23 +54,8 @@ describe("setup script", () => {
     const configPath = path.join(tempDir, "opencode", "opencode.json");
     expect(existsSync(configPath)).toBe(true);
 
-    const config = JSON.parse(readFileSync(configPath, "utf-8"));
+    const config = readConfig(configPath);
     expect(config.plugin).toContain("@mechanai/deepreview");
-  });
-
-  test("creates symlinks for agents and commands (global)", () => {
-    const result = run(tempDir);
-    expect(result.exitCode).toBe(0);
-
-    const agentsDir = path.join(tempDir, "opencode", "agents");
-    const synthesizer = path.join(agentsDir, "deepreview-synthesizer.md");
-    expect(existsSync(synthesizer)).toBe(true);
-    expect(lstatSync(synthesizer).isSymbolicLink()).toBe(true);
-
-    const commandsDir = path.join(tempDir, "opencode", "commands");
-    const mainCmd = path.join(commandsDir, "deepreview.md");
-    expect(existsSync(mainCmd)).toBe(true);
-    expect(lstatSync(mainCmd).isSymbolicLink()).toBe(true);
   });
 
   test("--local installs into .opencode/ in cwd", () => {
@@ -85,12 +78,12 @@ describe("setup script", () => {
     );
 
     run(tempDir);
-    const config = JSON.parse(readFileSync(path.join(configPath, "opencode.json"), "utf-8"));
+    const config = readConfig(path.join(configPath, "opencode.json"));
     expect(config.plugin).toEqual(["other-plugin", "@mechanai/deepreview"]);
 
     // Run again — should not duplicate
     run(tempDir);
-    const config2 = JSON.parse(readFileSync(path.join(configPath, "opencode.json"), "utf-8"));
+    const config2 = readConfig(path.join(configPath, "opencode.json"));
     expect(config2.plugin).toEqual(["other-plugin", "@mechanai/deepreview"]);
   });
 
@@ -104,6 +97,33 @@ describe("setup script", () => {
     const result = readFileSync(path.join(configDir, "opencode.jsonc"), "utf-8");
     expect(result).toContain("// My comment");
     expect(result).toContain("@mechanai/deepreview");
+  });
+});
+
+describe("setup script - symlinks", () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = makeTempDir();
+  });
+
+  afterEach(async () => {
+    await Bun.$`rm -rf ${tempDir}`;
+  });
+
+  test("creates symlinks for agents and commands (global)", () => {
+    const result = run(tempDir);
+    expect(result.exitCode).toBe(0);
+
+    const agentsDir = path.join(tempDir, "opencode", "agents");
+    const synthesizer = path.join(agentsDir, "deepreview-synthesizer.md");
+    expect(existsSync(synthesizer)).toBe(true);
+    expect(lstatSync(synthesizer).isSymbolicLink()).toBe(true);
+
+    const commandsDir = path.join(tempDir, "opencode", "commands");
+    const mainCmd = path.join(commandsDir, "deepreview.md");
+    expect(existsSync(mainCmd)).toBe(true);
+    expect(lstatSync(mainCmd).isSymbolicLink()).toBe(true);
   });
 
   test("removes stale symlinks on upgrade", () => {
@@ -134,6 +154,6 @@ describe("setup script", () => {
     // Should have replaced the dangling symlink
     const dest = path.join(agentsDir, "deepreview-synthesizer.md");
     expect(lstatSync(dest).isSymbolicLink()).toBe(true);
-    expect(existsSync(dest)).toBe(true); // Not dangling anymore
+    expect(existsSync(dest)).toBe(true);
   });
 });
