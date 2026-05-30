@@ -4,46 +4,110 @@
 version = "1.7.11"
 backend = "aqua:rhysd/actionlint"
 
+[tools.actionlint."platforms.linux-arm64"]
+checksum = "sha256:21bc0dfb57a913fe175298c2a9e906ee630f747cb66d0a934d0d4b69f4ee1235"
+url = "https://github.com/rhysd/actionlint/releases/download/v1.7.11/actionlint_1.7.11_linux_arm64.tar.gz"
+provenance = "github-attestations"
+
+[tools.actionlint."platforms.linux-arm64-musl"]
+checksum = "sha256:21bc0dfb57a913fe175298c2a9e906ee630f747cb66d0a934d0d4b69f4ee1235"
+url = "https://github.com/rhysd/actionlint/releases/download/v1.7.11/actionlint_1.7.11_linux_arm64.tar.gz"
+provenance = "github-attestations"
+
+[tools.actionlint."platforms.linux-x64"]
+checksum = "sha256:900919a84f2229bac68ca9cd4103ea297abc35e9689ebb842c6e34a3d1b01b0a"
+url = "https://github.com/rhysd/actionlint/releases/download/v1.7.11/actionlint_1.7.11_linux_amd64.tar.gz"
+provenance = "github-attestations"
+
+[tools.actionlint."platforms.linux-x64-musl"]
+checksum = "sha256:900919a84f2229bac68ca9cd4103ea297abc35e9689ebb842c6e34a3d1b01b0a"
+url = "https://github.com/rhysd/actionlint/releases/download/v1.7.11/actionlint_1.7.11_linux_amd64.tar.gz"
+provenance = "github-attestations"
+
+[tools.actionlint."platforms.macos-arm64"]
+checksum = "sha256:a21ba7366d8329e7223faee0ed69eb13da27fe8acabb356bb7eb0b7f1e1cb6d8"
+url = "https://github.com/rhysd/actionlint/releases/download/v1.7.11/actionlint_1.7.11_darwin_arm64.tar.gz"
+provenance = "github-attestations"
+
+[tools.actionlint."platforms.macos-x64"]
+checksum = "sha256:17ffc17fed8f0258ef6ad4aed932d3272464c7ef7d64e1cb0d65aa97c9752107"
+url = "https://github.com/rhysd/actionlint/releases/download/v1.7.11/actionlint_1.7.11_darwin_amd64.tar.gz"
+provenance = "github-attestations"
+
+[tools.actionlint."platforms.windows-x64"]
+checksum = "sha256:5414b7124a91f4b5abee62e5c9d84802237734f8d15b9b7032732a32c3ebffa3"
+url = "https://github.com/rhysd/actionlint/releases/download/v1.7.11/actionlint_1.7.11_windows_amd64.zip"
+provenance = "github-attestations"
+
 [[tools.bun]]
 version = "1.3.13"
 backend = "core:bun"
 
-[[tools.node]]
-version = "22.22.3"
-backend = "core:node"
+[tools.bun."platforms.linux-arm64"]
+checksum = "sha256:70bae41b3908b0a120e1e58c5c8af30e74afae3b8d11b0d3fdd8e787ddfb4b22"
+url = "https://github.com/oven-sh/bun/releases/download/bun-v1.3.13/bun-linux-aarch64.zip"
 
-[tools.node."platforms.linux-arm64"]
-checksum = "sha256:cc8bc82b2dd0b595c3b95a4c3c9c8c350907cff011afbdee3d1379e812e1e3e3"
-url = "https://nodejs.org/dist/v22.22.3/node-v22.22.3-linux-arm64.tar.gz"
+[tools.bun."platforms.linux-arm64-musl"]
+checksum = "sha256:5385e978107ce4934298d8d6afe9bfbb898683f6cc23e6753a0da60bc60c5b81"
+url = "https://github.com/oven-sh/bun/releases/download/bun-v1.3.13/bun-linux-aarch64-musl.zip"
 
-[tools.node."platforms.linux-arm64-musl"]
-checksum = "sha256:cc8bc82b2dd0b595c3b95a4c3c9c8c350907cff011afbdee3d1379e812e1e3e3"
-url = "https://nodejs.org/dist/v22.22.3/node-v22.22.3-linux-arm64.tar.gz"
+[tools.bun."platforms.linux-x64"]
+checksum = "sha256:79c0771fa8b92c33aae41e15a0e0d307ea99d0e2f00317c71c6c53237a78e25a"
+url = "https://github.com/oven-sh/bun/releases/download/bun-v1.3.13/bun-linux-x64.zip"
 
-[tools.node."platforms.linux-x64"]
-checksum = "sha256:c7a10d6816da8eaaa7534dd73c71c6e2b2c391dbbf845e364902d156615dd1b8"
-url = "https://nodejs.org/dist/v22.22.3/node-v22.22.3-linux-x64.tar.gz"
+[tools.bun."platforms.linux-x64-baseline"]
+checksum = "sha256:9d8a24292a7068090205daac0a5a223f5f69736f5287e37bf88d3b4031edc750"
+url = "https://github.com/oven-sh/bun/releases/download/bun-v1.3.13/bun-linux-x64-baseline.zip"
 
-[tools.node."platforms.linux-x64-musl"]
-checksum = "sha256:c7a10d6816da8eaaa7534dd73c71c6e2b2c391dbbf845e364902d156615dd1b8"
-url = "https://nodejs.org/dist/v22.22.3/node-v22.22.3-linux-x64.tar.gz"
+[tools.bun."platforms.linux-x64-musl"]
+checksum = "sha256:5b91a48f0b00df9fd2da8bff1a795d2659d842da966432969203f25da19d1c74"
+url = "https://github.com/oven-sh/bun/releases/download/bun-v1.3.13/bun-linux-x64-musl.zip"
 
-[tools.node."platforms.macos-arm64"]
-checksum = "sha256:0da7ff74ef8611328c8212f17943368713a2ad953fb7d89a8c8a0eae87c23207"
-url = "https://nodejs.org/dist/v22.22.3/node-v22.22.3-darwin-arm64.tar.gz"
+[tools.bun."platforms.linux-x64-musl-baseline"]
+checksum = "sha256:88ca7c7ad235b498f549eea2f770f434e9f0f5e9ba95168a2d3a1f235184c394"
+url = "https://github.com/oven-sh/bun/releases/download/bun-v1.3.13/bun-linux-x64-musl-baseline.zip"
 
-[tools.node."platforms.macos-x64"]
-checksum = "sha256:45830ba752fa0d892c6dcd640946669801293cac820a33591ded40ac075198ec"
-url = "https://nodejs.org/dist/v22.22.3/node-v22.22.3-darwin-x64.tar.gz"
+[tools.bun."platforms.macos-arm64"]
+checksum = "sha256:5467e3f65dba526b9fea98f0cce04efafc0c63e169733ec27b876a3ad32da190"
+url = "https://github.com/oven-sh/bun/releases/download/bun-v1.3.13/bun-darwin-aarch64.zip"
 
-[tools.node."platforms.windows-x64"]
-checksum = "sha256:6c8d54f635feff4df76c2ca80f45332eb2ff57d25226edce36592e51a177ee33"
-url = "https://nodejs.org/dist/v22.22.3/node-v22.22.3-win-x64.zip"
+[tools.bun."platforms.macos-x64"]
+checksum = "sha256:e5a6c8b64f419925232d111ecb13e25f0abf55e54f792341f987623fd0778009"
+url = "https://github.com/oven-sh/bun/releases/download/bun-v1.3.13/bun-darwin-x64.zip"
+
+[tools.bun."platforms.macos-x64-baseline"]
+checksum = "sha256:a98ba6a480f22fda9b343626b906a4e26aa53618bf85d2bc5928ecf2ba45f0ed"
+url = "https://github.com/oven-sh/bun/releases/download/bun-v1.3.13/bun-darwin-x64-baseline.zip"
+
+[tools.bun."platforms.windows-x64"]
+checksum = "sha256:85b14f3e0584218e9b63407b3aa6b90c4835ec5c32435c1f12cb6fc13667c7c9"
+url = "https://github.com/oven-sh/bun/releases/download/bun-v1.3.13/bun-windows-x64.zip"
+
+[tools.bun."platforms.windows-x64-baseline"]
+checksum = "sha256:c68c7903c1190101590cc1b2129835f47211b3b37ae87759f2b97d6534aa3ad1"
+url = "https://github.com/oven-sh/bun/releases/download/bun-v1.3.13/bun-windows-x64-baseline.zip"
 
 [[tools.shellcheck]]
 version = "0.10.0"
 backend = "aqua:koalaman/shellcheck"
 
-[[tools.yarn]]
-version = "4.15.0"
-backend = "vfox:mise-plugins/vfox-yarn"
+[tools.shellcheck."platforms.linux-arm64"]
+url = "https://github.com/koalaman/shellcheck/releases/download/v0.10.0/shellcheck-v0.10.0.linux.aarch64.tar.xz"
+
+[tools.shellcheck."platforms.linux-arm64-musl"]
+url = "https://github.com/koalaman/shellcheck/releases/download/v0.10.0/shellcheck-v0.10.0.linux.aarch64.tar.xz"
+
+[tools.shellcheck."platforms.linux-x64"]
+url = "https://github.com/koalaman/shellcheck/releases/download/v0.10.0/shellcheck-v0.10.0.linux.x86_64.tar.xz"
+
+[tools.shellcheck."platforms.linux-x64-musl"]
+url = "https://github.com/koalaman/shellcheck/releases/download/v0.10.0/shellcheck-v0.10.0.linux.x86_64.tar.xz"
+
+[tools.shellcheck."platforms.macos-arm64"]
+url = "https://github.com/koalaman/shellcheck/releases/download/v0.10.0/shellcheck-v0.10.0.darwin.aarch64.tar.xz"
+
+[tools.shellcheck."platforms.macos-x64"]
+url = "https://github.com/koalaman/shellcheck/releases/download/v0.10.0/shellcheck-v0.10.0.darwin.x86_64.tar.xz"
+
+[tools.shellcheck."platforms.windows-x64"]
+url = "https://github.com/koalaman/shellcheck/releases/download/v0.10.0/shellcheck-v0.10.0.zip"
