@@ -9,13 +9,15 @@
   },
   "files": [
     "src/",
+    "dist/",
     ".opencode/"
   ],
   "type": "module",
   "main": "./.opencode/plugins/deepreview.ts",
   "exports": {
     ".": "./.opencode/plugins/deepreview.ts",
-    "./api": "./src/post-review.ts"
+    "./api": "./src/post-review.ts",
+    "./setup": "./dist/setup.mjs"
   },
   "publishConfig": {
     "access": "public"
@@ -23,6 +25,7 @@
   "dependencies": {
     "gray-matter": "4.0.3",
     "js-yaml": "4.1.0",
+    "jsonc-parser": "3.3.1",
     "parse-diff": "0.11.1"
   },
   "devDependencies": {
@@ -42,6 +45,7 @@
     }
   },
   "engines": {
-    "bun": ">=1.2.0"
+    "bun": ">=1.2.0",
+    "node": ">=22.0.0"
   }
 }
