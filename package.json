@@ -9,6 +9,7 @@
   },
   "files": [
     "src/",
+    "dist/",
     ".opencode/"
   ],
   "type": "module",
@@ -16,7 +17,7 @@
   "exports": {
     ".": "./.opencode/plugins/deepreview.ts",
     "./api": "./src/post-review.ts",
-    "./setup": "./src/setup.ts"
+    "./setup": "./dist/setup.mjs"
   },
   "publishConfig": {
     "access": "public"
@@ -44,6 +45,7 @@
     }
   },
   "engines": {
-    "bun": ">=1.2.0"
+    "bun": ">=1.2.0",
+    "node": ">=22.0.0"
   }
 }

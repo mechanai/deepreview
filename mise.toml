@@ -3,6 +3,10 @@ bun = "1"
 actionlint = "1.7.11"
 shellcheck = "0.10.0"
 
+[tasks.build]
+description = "Build setup script for Node.js compatibility"
+run = "bun build src/setup.ts --outfile dist/setup.mjs --target node --format esm --packages external"
+
 [tasks.fmt]
 description = "Format repo"
 depends = ["fmt:*"]
