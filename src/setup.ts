@@ -26,12 +26,13 @@ import { applyEdits, modify, parse as parseJsonc } from "jsonc-parser";
 
 const PACKAGE_NAME = "@mechanai/deepreview";
 const local = process.argv.includes("--local");
+const cwd = process.cwd();
 
 const globalConfigDir = path.join(
   process.env.XDG_CONFIG_HOME ?? path.join(os.homedir(), ".config"),
   "opencode",
 );
-const targetDir = local ? path.join(process.cwd(), ".opencode") : globalConfigDir;
+const targetDir = local ? path.join(cwd, ".opencode") : globalConfigDir;
 
 // Resolve the package directory (where this script lives)
 const packageDir = path.resolve(import.meta.dirname, "..");
@@ -39,7 +40,7 @@ const packageOpencode = path.join(packageDir, ".opencode");
 
 function ensurePluginInConfig() {
   const configFiles = ["opencode.jsonc", "opencode.json"];
-  const searchDir = local ? process.cwd() : globalConfigDir;
+  const searchDir = local ? cwd : globalConfigDir;
   let configPath: string | undefined;
 
   for (const file of configFiles) {
@@ -86,7 +87,7 @@ function ensurePluginInConfig() {
   // Use jsonc-parser to insert into the plugin array without stripping comments
   const formatting = { formattingOptions: { insertSpaces: true, tabSize: 2 } };
   const edits = Array.isArray(config.plugin)
-    ? modify(raw, ["plugin", plugins.length], PACKAGE_NAME, formatting)
+    ? modify(raw, ["plugin", pluginArray.length], PACKAGE_NAME, formatting)
     : modify(raw, ["plugin"], [PACKAGE_NAME], formatting);
 
   writeFileSync(configPath, applyEdits(raw, edits));
@@ -105,16 +106,14 @@ function symlinkDirectory(kind: "agents" | "commands") {
 
   // Remove stale deepreview symlinks that no longer exist in the package
   for (const file of readdirSync(destDir)) {
-    if (!file.includes("deepreview")) continue;
+    if (!file.startsWith("deepreview-") && !file.startsWith("_deepreview-")) continue;
     const dest = path.join(destDir, file);
     try {
       if (lstatSync(dest).isSymbolicLink() && !sourceFiles.has(file)) {
         unlinkSync(dest);
       }
     } catch (err: unknown) {
-      const code =
-        err instanceof Error && "code" in err ? (err as { code: unknown }).code : undefined;
-      if (err instanceof Error && code !== "ENOENT") {
+      if (err instanceof Error && !("code" in err && err.code === "ENOENT")) {
         console.warn(`Could not check ${dest}: ${err.message}`);
       }
     }
@@ -122,7 +121,7 @@ function symlinkDirectory(kind: "agents" | "commands") {
 
   for (const file of sourceFiles) {
     const dest = path.join(destDir, file);
-    const source = path.join(sourceDir, file);
+    const source = path.relative(destDir, path.join(sourceDir, file));
 
     try {
       // Use lstatSync to detect both regular files and dangling symlinks
@@ -132,8 +131,10 @@ function symlinkDirectory(kind: "agents" | "commands") {
         continue;
       }
       unlinkSync(dest);
-    } catch {
-      // File doesn't exist, proceed
+    } catch (err: unknown) {
+      if (err instanceof Error && "code" in err && err.code !== "ENOENT") {
+        throw err;
+      }
     }
     symlinkSync(source, dest);
     created++;
