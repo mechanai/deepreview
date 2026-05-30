@@ -20,8 +20,6 @@ npx @mechanai/deepreview@latest/setup
 npx @mechanai/deepreview@latest/setup --local
 ```
 
-Alternatively, add `"@mechanai/deepreview"` to the `plugin` array in your `opencode.json` manually — the setup script simply automates this plus symlink creation.
-
 This will:
 
 1. Add `@mechanai/deepreview` to the `plugin` array in your `opencode.json` (creates the file if needed)
@@ -30,6 +28,8 @@ This will:
 > [!NOTE]
 > The symlinks are needed because OpenCode does not yet auto-discover
 > agents and commands from installed plugin packages.
+
+If you only need the plugin tool (without agents/commands), you can add `"@mechanai/deepreview"` to the `plugin` array in your `opencode.json` manually instead.
 
 ## Usage
 
