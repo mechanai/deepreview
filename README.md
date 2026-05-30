@@ -13,6 +13,13 @@ bunx @mechanai/deepreview@latest/setup          # Global install (~/.config/open
 bunx @mechanai/deepreview@latest/setup --local   # Project-level install (.opencode/)
 ```
 
+Or with Node.js (v22+):
+
+```bash
+npx @mechanai/deepreview@latest/setup
+npx @mechanai/deepreview@latest/setup --local
+```
+
 Alternatively, add `"@mechanai/deepreview"` to the `plugin` array in your `opencode.json` manually — the setup script simply automates this plus symlink creation.
 
 This will:
@@ -70,6 +77,7 @@ its own context, keeping token usage minimal.
 ## Requirements
 
 - [OpenCode](https://opencode.ai)
+- [Bun](https://bun.sh/) >= 1.2 or [Node.js](https://nodejs.org/) >= 22
 - `git`
 - `gh` CLI (only for PR commands)
 
