@@ -25,6 +25,9 @@
   "publishConfig": {
     "access": "public"
   },
+  "scripts": {
+    "prepare": "mise run build"
+  },
   "dependencies": {
     "gray-matter": "4.0.3",
     "js-yaml": "4.1.0",
