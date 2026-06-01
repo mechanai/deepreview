@@ -21,8 +21,12 @@ For each fix in the plan, in the order specified by the "Order of Operations" se
 
 1. Read the current file at the referenced location
 2. Apply the code change exactly as specified in the plan
-3. Run `git diff <file>` to verify the edit looks correct
-4. Note what was changed (file path + one-line description)
+3. **Globalize check:** After applying, check whether other files _listed in input.txt or the plan_ have the same pattern. If so, apply the equivalent fix there too. Do NOT search the broader codebase. Common cases:
+   - A loop command fix that applies to the other loop command (code-loop ↔ spec-loop)
+   - A prompt/contract change affecting multiple agent files
+   - A variable rename or policy change referenced in multiple files
+4. Run `git diff <file>` to verify the edit looks correct
+5. Note what was changed (file path + one-line description)
 
 If a fix cannot be applied (file doesn't exist, code doesn't match what was expected), skip it and note the failure.
 
