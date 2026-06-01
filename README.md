@@ -16,8 +16,8 @@ bunx @mechanai/deepreview@latest/setup --local   # Project-level install (.openc
 Or with Node.js (v22+):
 
 ```bash
-npx @mechanai/deepreview@latest/setup
-npx @mechanai/deepreview@latest/setup --local
+npx --package @mechanai/deepreview@latest deepreview-setup
+npx --package @mechanai/deepreview@latest deepreview-setup --local
 ```
 
 This will:

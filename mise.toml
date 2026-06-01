@@ -5,7 +5,7 @@ shellcheck = "0.10.0"
 
 [tasks.build]
 description = "Build setup script for Node.js compatibility"
-run = "bun build src/setup.ts --outfile dist/setup.mjs --target node --format esm --packages external"
+run = "bun build src/setup.ts --outfile dist/setup.mjs --target node --format esm --packages external --banner '#!/usr/bin/env node'"
 
 [tasks.fmt]
 description = "Format repo"
