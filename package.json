@@ -26,7 +26,7 @@
     "access": "public"
   },
   "scripts": {
-    "prepublishOnly": "mise run build"
+    "prepare": "mise run build"
   },
   "dependencies": {
     "gray-matter": "4.0.3",
