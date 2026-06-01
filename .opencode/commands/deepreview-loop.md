@@ -7,19 +7,27 @@ You are an orchestrator that runs deepreview repeatedly until the code is clean.
 STEP 1: DETERMINE INPUT MODE
 Parse "$ARGUMENTS" the same way as /deepreview:
 
+- If it starts with `--context <path>`, extract CONTEXT_FILE=<path> and remove it from $ARGUMENTS before parsing the rest.
+- Validate CONTEXT_FILE: it must be a relative path (no leading `/`), must not contain `..`, must exist on disk, and must be a regular file (not a directory or symlink to outside the project), and must be under 50KB. If validation fails, tell the user the error and STOP.
 - If it is a number → MODE=pr, TARGET="$ARGUMENTS"
 - If it is a file path or multiple file paths → MODE=files, TARGET="$ARGUMENTS"
 - If it is empty → MODE=branch, TARGET=""
 
 Set ITERATION=1
+Set PRIOR_CONTEXT="" (empty — built up across iterations)
+Set ALL_SESSION_DIRS=[] (list of all session directories used, in order)
+
+If CONTEXT_FILE exists, read its contents and set PRIOR_CONTEXT to:
+"## Design Decisions (intentional — do not flag)\nThe following are deliberate design choices. Do NOT flag these as issues or suggest alternatives.\n`\n" + contents of CONTEXT_FILE + "\n`\n"
 
 STEP 2: RUN INITIAL DEEPREVIEW (full pipeline with cross-validation)
 Run the full deepreview pipeline (Stages 1-5 from the deepreview command):
 
 - Determine SESSION_DIR and write input.txt
-- Stage 1: 5 parallel reviewers
+- Append SESSION_DIR to ALL_SESSION_DIRS
+- Stage 1: 5 parallel reviewers — prepend PRIOR_CONTEXT (if non-empty) to each reviewer's prompt as "${PRIOR_CONTEXT}You are reviewing ... Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-{perspective}.md."
 - Stage 2: 5 parallel validators (cross-validation)
-- Stage 3: Synthesizer
+  - Note: validators do NOT receive PRIOR_CONTEXT. This is intentional — validators independently verify reviewer claims without being influenced by design context.- Stage 3: Synthesizer
 - Stage 4: Implementation planner
 
 Record the stats from the synthesis return: count of critical, warning, and suggestion findings.
@@ -50,6 +58,7 @@ If ITERATION > 5:
 
 Create new session directory: SESSION_DIR=".ai/deepreview/loop-iter$ITERATION-$(date +%Y-%m-%d-%H%M%S)"
 Run `mkdir -p $SESSION_DIR`
+Append SESSION_DIR to ALL_SESSION_DIRS
 
 Prepare fresh input:
 
@@ -58,27 +67,65 @@ Prepare fresh input:
 
 Check if input.txt is empty. If empty, tell user "Nothing to review — all changes resolved." and STOP.
 
+STEP 5a: BUILD PRIOR CONTEXT
+Accumulate findings from ALL previous iterations into PRIOR_CONTEXT so no finding is re-reported.
+
+To build this, dispatch a helper task that reads ALL previous syntheses:
+NOTE: Interpolate the actual directory paths from ALL_SESSION_DIRS into this task string — the subagent cannot access your variables.
+Task — Use the Task tool with subagent_type="general":
+"Read the synthesis files from these directories: [LIST EACH PATH FROM ALL_SESSION_DIRS EXCLUDING CURRENT]. If any synthesis file does not exist, skip it. Extract ALL findings across them as a deduplicated Markdown list in this exact format:
+
+## Prior Findings (already reported — do not re-report or verify)
+
+- [Short Issue Title] ([category]) — [file:line]
+
+## Covered Regions (already examined — prioritize elsewhere)
+
+- [file:line-range] (pad each finding's file:line by 20 lines in each direction)
+
+Deduplicate findings that appear in multiple syntheses. Return ONLY these two sections, nothing else."
+
+Set PRIOR_CONTEXT to the returned text. Validate that it contains "## Prior Findings" — if not, warn the user ("Helper returned malformed prior context — proceeding without deduplication") and set PRIOR_CONTEXT="". If CONTEXT_FILE exists, prepend:
+"## Design Decisions (intentional — do not flag)\nThe following are deliberate design choices. Do NOT flag these as issues or suggest alternatives.\n`\n" + contents of CONTEXT_FILE + "\n`\n\n"
+
 NOW RUN A LIGHTWEIGHT REVIEW (Stages 1, 3, 4 only — NO cross-validation):
 
-The key difference: iteration 2+ skips cross-validation entirely. This prevents the validators from filtering out new issues introduced by fixes. Each iteration is a fresh, unbiased review.
+The key difference: iteration 2+ skips cross-validation. This prevents validators from filtering out new issues introduced by fixes.
 
 Stage 1 — DISPATCH 5 PARALLEL REVIEWERS:
-Each reviewer prompt MUST include: "This is a fresh review. You have no prior context about this code. Review it as if seeing it for the first time. Do not assume anything is correct just because it looks intentional."
+Each reviewer prompt MUST include PRIOR_CONTEXT and the novelty-seeking framing below.
+
+The REVIEWER_PREAMBLE for all iter2+ reviewers is:
+"Your goal is to find issues that PREVIOUS reviewers missed. Do NOT re-report, verify, or comment on prior findings.
+
+$PRIOR_CONTEXT
+
+Find genuinely new issues. You may find different issues in covered regions, but prioritize areas not yet examined."
 
 Task 1 — Use the Task tool with subagent_type="deepreview-correctness":
-"This is a fresh review. You have no prior context about this code. Review it as if seeing it for the first time. Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-correctness.md."
+"$REVIEWER_PREAMBLE
+
+Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-correctness.md."
 
 Task 2 — Use the Task tool with subagent_type="deepreview-security":
-"This is a fresh review. You have no prior context about this code. Review it as if seeing it for the first time. Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-security.md."
+"$REVIEWER_PREAMBLE
+
+Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-security.md."
 
 Task 3 — Use the Task tool with subagent_type="deepreview-architecture":
-"This is a fresh review. You have no prior context about this code. Review it as if seeing it for the first time. Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-architecture.md."
+"$REVIEWER_PREAMBLE
+
+Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-architecture.md."
 
 Task 4 — Use the Task tool with subagent_type="deepreview-docs":
-"This is a fresh review. You have no prior context about this code. Review it as if seeing it for the first time. Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-docs.md."
+"$REVIEWER_PREAMBLE
+
+Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-docs.md."
 
 Task 5 — Use the Task tool with subagent_type="deepreview-compatibility":
-"This is a fresh review. You have no prior context about this code. Review it as if seeing it for the first time. Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-compatibility.md."
+"$REVIEWER_PREAMBLE
+
+Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-compatibility.md."
 
 Wait for all 5. Record which succeeded.
 
@@ -113,5 +160,7 @@ IMPORTANT RULES:
 - Apply ALL findings (critical, warning, AND suggestion) — the goal is a clean review.
 - Do NOT ask the user for permission to apply fixes. Apply automatically.
 - DO ask the user if iteration limit is hit or deadlock is detected.
-- Iteration 2+ MUST skip cross-validation and MUST include "fresh review" framing in prompts.
+- Iteration 2+ MUST skip cross-validation, MUST include PRIOR_CONTEXT, and MUST use novelty-seeking framing.
+- Iteration 2+ MUST NOT tell reviewers to "verify" or "check status of" prior findings.
 - Each iteration uses a NEW session directory — never reuse a previous one.
+- If --context file is provided, include its contents under "Design Decisions" in PRIOR_CONTEXT for ALL iterations (including iter1).

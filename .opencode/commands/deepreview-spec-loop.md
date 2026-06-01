@@ -6,15 +6,21 @@ You are an orchestrator that runs deepreview-spec repeatedly until the spec/plan
 
 STEP 1: DETERMINE INPUT
 
-- If "$ARGUMENTS" is empty, tell the user "Usage: /deepreview-spec-loop <file1.md> [file2.md ...]" and STOP.
+- If "$ARGUMENTS" starts with `--context <path>`, extract CONTEXT_FILE=<path> and remove it from $ARGUMENTS before parsing the rest.
+- Validate CONTEXT_FILE: it must be a relative path (no leading `/`), must not contain `..`, must exist on disk, and must be a regular file (not a directory or symlink to outside the project), and must be under 50KB. If validation fails, tell the user the error and STOP.
+- If remaining "$ARGUMENTS" is empty, tell the user "Usage: /deepreview-spec-loop [--context <file>] <file1> [file2 ...]" and STOP.
 - Set FILES="$ARGUMENTS"
 - Set ITERATION=1
+- Set PRIOR_CONTEXT="" (empty — built up across iterations)
+- Set ALL_SESSION_DIRS=[] (list of all session directories used, in order)
+- If CONTEXT_FILE exists, set PRIOR_CONTEXT="## Design Decisions (intentional — do not flag)\nThe following are deliberate design choices. Do NOT flag these as issues or suggest alternatives.\n`\n" + contents of CONTEXT_FILE + "\n`\n\n"
 
 STEP 2: RUN INITIAL DEEPREVIEW-SPEC (full pipeline with cross-validation)
 Run the full deepreview-spec pipeline (Stages 1-5 from the deepreview-spec command):
 
 - Determine SESSION_DIR=".ai/deepreview/spec-loop-iter1-$(date +%Y-%m-%d-%H%M%S)" and write input.txt
-- Stage 1: 5 parallel reviewers (completeness, consistency, feasibility, docs, architecture)
+- Append SESSION_DIR to ALL_SESSION_DIRS
+- Stage 1: 5 parallel reviewers (completeness, consistency, feasibility, docs, architecture) — prepend PRIOR_CONTEXT (if non-empty) to each reviewer's prompt as "${PRIOR_CONTEXT}You are reviewing ... Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-{perspective}.md."
 - Stage 2: 5 parallel validators (cross-validation)
 - Stage 3: Synthesizer
 - Stage 4: Implementation planner (spec changes, not code changes)
@@ -53,41 +59,78 @@ If ITERATION > 7:
 
 Create new session directory: SESSION_DIR=".ai/deepreview/spec-loop-iter$ITERATION-$(date +%Y-%m-%d-%H%M%S)"
 Run `mkdir -p $SESSION_DIR`
+Append SESSION_DIR to ALL_SESSION_DIRS
 
 Re-read the same files into `$SESSION_DIR/input.txt`:
 `for f in $FILES; do echo "=== $f ===" >> $SESSION_DIR/input.txt; cat "$f" >> $SESSION_DIR/input.txt; echo >> $SESSION_DIR/input.txt; done`
 
 Check if input.txt is empty. If empty, tell user "Nothing to review — files are empty." and STOP.
 
+BUILD PRIOR CONTEXT FOR THIS ITERATION:
+Dispatch a helper task to extract findings from ALL previous syntheses:
+Task — Use the Task tool with subagent_type="general":
+"Read the synthesis files from ALL completed iterations ([LIST EACH PATH FROM ALL_SESSION_DIRS EXCLUDING CURRENT]). If any synthesis file does not exist, skip it. Extract ALL findings across them as a deduplicated Markdown list in this exact format:
+
+## Prior Findings (already reported — do not re-report or verify)
+
+- [Short Issue Title] ([category]) — [file:line or section reference]
+
+## Covered Regions (already examined — prioritize elsewhere)
+
+- [file or section references, padded generously around each finding location]
+
+Deduplicate findings that appear in multiple syntheses. Return ONLY these two sections, nothing else."
+
+Set PRIOR_CONTEXT to the returned text. If CONTEXT_FILE exists, prepend:
+"## Design Decisions (intentional — do not flag)\nThe following are deliberate design choices. Do NOT flag these as issues or suggest alternatives.\n`\n" + contents of CONTEXT_FILE + "\n`\n\n"
+
+The REVIEWER_PREAMBLE for all iter2+ reviewers is:
+"Your goal is to find issues that PREVIOUS reviewers missed. Do NOT re-report, verify, or comment on prior findings.
+
+$PRIOR_CONTEXT
+
+Find genuinely new issues. You may find different issues in covered regions, but prioritize areas not yet examined. Focus ONLY on objective issues — do NOT flag stylistic preferences."
+
+<!-- The objectivity constraint is spec-loop-specific because specs lack objective correctness criteria, making subjective drift more likely in iterative passes. -->
+
 NOW RUN A FULL REVIEW (with cross-validation):
 
-Unlike the code loop, spec review iterations ALWAYS include cross-validation. Specs have no
-objective "correct" — without validators filtering subjective opinions, reviewers diverge rather
-than converge, producing more findings each iteration instead of fewer.
+Unlike the code loop, spec review iterations ALWAYS include cross-validation. Without validators
+filtering subjective opinions, reviewers diverge rather than converge.
 
 Stage 1 — DISPATCH 5 PARALLEL REVIEWERS:
-Each reviewer prompt MUST include: "This is a fresh review. You have no prior context about this spec. Review it as if seeing it for the first time. Do not assume anything is correct just because it looks intentional. Focus ONLY on objective issues (contradictions, gaps, impossibilities) — do NOT flag stylistic preferences or reorganization suggestions."
 
 Task 1 — Use the Task tool with subagent_type="deepreview-spec-completeness":
-"This is a fresh review. You have no prior context about this spec. Review it as if seeing it for the first time. Focus ONLY on objective issues — do NOT flag stylistic preferences. Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-completeness.md."
+"$REVIEWER_PREAMBLE
+
+Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-completeness.md."
 
 Task 2 — Use the Task tool with subagent_type="deepreview-spec-consistency":
-"This is a fresh review. You have no prior context about this spec. Review it as if seeing it for the first time. Focus ONLY on objective issues — do NOT flag stylistic preferences. Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-consistency.md."
+"$REVIEWER_PREAMBLE
+
+Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-consistency.md."
 
 Task 3 — Use the Task tool with subagent_type="deepreview-spec-feasibility":
-"This is a fresh review. You have no prior context about this spec. Review it as if seeing it for the first time. Focus ONLY on objective issues — do NOT flag stylistic preferences. Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-feasibility.md."
+"$REVIEWER_PREAMBLE
+
+Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-feasibility.md."
 
 Task 4 — Use the Task tool with subagent_type="deepreview-docs":
-"This is a fresh review. You have no prior context about this spec. Review it as if seeing it for the first time. Focus ONLY on objective issues — do NOT flag stylistic preferences. Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-docs.md."
+"$REVIEWER_PREAMBLE
+
+Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-docs.md."
 
 Task 5 — Use the Task tool with subagent_type="deepreview-architecture":
-"This is a fresh review. You have no prior context about this spec. Review it as if seeing it for the first time. Focus ONLY on objective issues — do NOT flag stylistic preferences. Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-architecture.md."
+"$REVIEWER_PREAMBLE
+
+Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-architecture.md."
 
 Wait for all 5. Record which succeeded.
 
 Stage 2 — DISPATCH 5 PARALLEL VALIDATORS (cross-validation):
 Task 6-10 — Use the Task tool with subagent_type="deepreview-validator" (5 times, one per perspective):
 Each validator reads ALL review files and writes to $SESSION_DIR/validated-{completeness,consistency,feasibility,docs,architecture}.md.
+Note: Validators intentionally do NOT receive PRIOR_CONTEXT. They filter on objective merit only — whether findings are technically valid and actionable. The novelty filter is applied at the reviewer level.
 
 Wait for all 5.
 
@@ -108,7 +151,7 @@ Go to STEP 3.
 STEP 6: DIVERGENCE AND DEADLOCK DETECTION
 Track finding counts across iterations. Detect TWO failure modes:
 
-A) DIVERGENCE: If total findings (critical + warning + suggestion) INCREASE from one iteration to the next:
+A) DIVERGENCE: If total findings INCREASE from one iteration to the next:
 
 - Tell the user: "Divergence detected: findings increased from N to M. The review is not converging — fixes are introducing new issues or reviewers are finding new stylistic concerns."
 - Show the iteration-over-iteration stats.
@@ -130,4 +173,7 @@ IMPORTANT RULES:
 - Do NOT ask the user for permission to apply fixes. Apply automatically.
 - DO ask the user if iteration limit is hit, divergence is detected, or deadlock is detected.
 - ALL iterations include cross-validation (unlike the code loop).
+- Iteration 2+ MUST include PRIOR_CONTEXT and novelty-seeking framing.
+- Iteration 2+ MUST NOT tell reviewers to "verify" or "check status of" prior findings.
 - Each iteration uses a NEW session directory — never reuse a previous one.
+- If --context file is provided, include its contents under "Design Decisions" in PRIOR_CONTEXT for ALL iterations (including iter1).

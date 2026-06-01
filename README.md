@@ -35,14 +35,18 @@ This will:
 /deepreview                   # Review current branch vs main
 /deepreview 123               # Review PR #123
 /deepreview file1.ts file2.ts # Review specific files
+/deepreview --context decisions.md   # Review with design context (suppresses known decisions)
 
 /deepreview-loop              # Review + fix loop (repeats until clean or 5 iterations)
 /deepreview-loop 123          # Same, targeting a PR
+/deepreview-loop --context decisions.md       # Loop with design context
+/deepreview-spec-loop --context decisions.md spec.md  # Spec loop with design context
 
 /deepreview-pr-review 123     # Review PR and post findings as a pending GitHub review
 
-/deepreview-spec spec.md      # Spec-focused review (completeness, consistency, feasibility)
-/deepreview-spec-loop spec.md # Spec review + fix loop
+/deepreview-spec spec.md                  # Spec-focused review (completeness, consistency, feasibility)
+/deepreview-spec --context decisions.md spec.md  # Spec review with design context
+/deepreview-spec-loop spec.md             # Spec review + fix loop
 ```
 
 All commands accept a branch diff, PR number, or file path(s). The `-loop` variants

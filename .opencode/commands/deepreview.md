@@ -7,6 +7,8 @@ You are an orchestrator for a multi-agent code review pipeline. Follow these ste
 STEP 1: DETERMINE INPUT MODE AND SESSION DIRECTORY
 Classify "$ARGUMENTS":
 
+- If it starts with `--context <path>`, extract CONTEXT_FILE=<path> and remove it from $ARGUMENTS before parsing the rest.
+- Validate CONTEXT_FILE: it must be a relative path (no leading `/`), must not contain `..`, must exist on disk, and must be a regular file (not a directory or symlink to outside the project), and must be under 50KB. If validation fails, tell the user the error and STOP.
 - If it is a number → MODE=pr
 - If it is a file path (ends in .md, .txt, .yaml, .json, or file exists on disk) → MODE=files
 - If it is multiple space-separated file paths → MODE=files
@@ -36,23 +38,28 @@ Set INPUT_DESCRIPTION based on mode:
 - MODE=branch: "a branch diff against main"
 - MODE=files: "the following files: <list of filenames>"
 
+If CONTEXT_FILE exists, set DESIGN_CONTEXT to the contents of that file. Build a CONTEXT_PREAMBLE:
+"## Design Decisions (intentional — do not flag)\nThe following are deliberate design choices. Do NOT flag these as issues or suggest alternatives.\n`\n$DESIGN_CONTEXT\n`\n\n"
+
+If CONTEXT_FILE does not exist, set CONTEXT_PREAMBLE="" (empty string).
+
 STEP 3: DISPATCH STAGE 1 — INITIAL REVIEW (5 parallel tasks)
 Dispatch ALL FIVE of these Task tool calls simultaneously in a single message:
 
 Task 1 — Use the Task tool with subagent_type="deepreview-correctness":
-"You are reviewing $INPUT_DESCRIPTION. Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-correctness.md."
+"${CONTEXT_PREAMBLE}You are reviewing $INPUT_DESCRIPTION. Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-correctness.md."
 
 Task 2 — Use the Task tool with subagent_type="deepreview-security":
-"You are reviewing $INPUT_DESCRIPTION. Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-security.md."
+"${CONTEXT_PREAMBLE}You are reviewing $INPUT_DESCRIPTION. Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-security.md."
 
 Task 3 — Use the Task tool with subagent_type="deepreview-architecture":
-"You are reviewing $INPUT_DESCRIPTION. Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-architecture.md."
+"${CONTEXT_PREAMBLE}You are reviewing $INPUT_DESCRIPTION. Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-architecture.md."
 
 Task 4 — Use the Task tool with subagent_type="deepreview-docs":
-"You are reviewing $INPUT_DESCRIPTION. Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-docs.md."
+"${CONTEXT_PREAMBLE}You are reviewing $INPUT_DESCRIPTION. Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-docs.md."
 
 Task 5 — Use the Task tool with subagent_type="deepreview-compatibility":
-"You are reviewing $INPUT_DESCRIPTION. Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-compatibility.md."
+"${CONTEXT_PREAMBLE}You are reviewing $INPUT_DESCRIPTION. Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-compatibility.md."
 
 Wait for all 5 to return. Record which succeeded and which failed.
 
