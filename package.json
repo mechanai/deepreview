@@ -7,6 +7,9 @@
     "type": "git",
     "url": "https://github.com/mechanai/deepreview"
   },
+  "bin": {
+    "deepreview-setup": "./dist/setup.mjs"
+  },
   "files": [
     "src/",
     "dist/",
@@ -17,7 +20,7 @@
   "exports": {
     ".": "./.opencode/plugins/deepreview.ts",
     "./api": "./src/post-review.ts",
-    "./setup": "./dist/setup.mjs"
+    "./setup": "./src/setup.ts"
   },
   "publishConfig": {
     "access": "public"
