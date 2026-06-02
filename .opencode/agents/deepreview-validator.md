@@ -8,6 +8,9 @@ permission:
     "git log*": allow
     "git blame*": allow
     "git show*": allow
+    "*--help*": allow
+    "*--version*": allow
+    "man *": allow
     "*": deny
 ---
 
@@ -23,11 +26,12 @@ For each finding in all 3 reviews:
 
 1. Read the source file and line referenced in the finding
 2. Determine if the claimed issue actually exists in the code
-3. Check if the issue is already handled elsewhere (error handling, validation, guards)
-4. Classify the finding:
+3. If the finding makes claims about external tool behavior (CLI flags, API parameters, library methods), **verify those claims**. Run `--help`, check man pages, or use WebFetch to check documentation. If the claimed behavior doesn't exist, classify as disproved.
+4. Check if the issue is already handled elsewhere (error handling, validation, guards)
+5. Classify the finding:
    - **confirmed** (high confidence): you verified the issue exists in the code
    - **plausible** (medium confidence): the issue might exist but you cannot fully verify
-   - **disproved** (low confidence): the code already handles this, or the claim is wrong
+   - **disproved** (low confidence): the code already handles this, the claim is wrong, or the finding assumes external tool/API behavior that doesn't exist
 
 Discard all low-confidence (disproved) findings entirely.
 
