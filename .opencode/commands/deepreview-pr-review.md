@@ -18,16 +18,55 @@ Check if input.txt is empty (0 bytes). If empty, tell the user "Nothing to revie
 Get and store the PR head SHA:
 Run `gh pr view $ARGUMENTS --json headRefOid --jq .headRefOid` and save the output as PR_HEAD_SHA.
 
-## Stage 1-3: Shared Pipeline
+STEP 3: DISPATCH STAGE 1 — INITIAL REVIEW (5 parallel tasks)
+Dispatch ALL FIVE of these Task tool calls simultaneously in a single message:
 
-Follow the shared pipeline at `commands/_deepreview-pipeline.md` with:
+Task 1 — Use the Task tool with subagent_type="deepreview-correctness":
+"You are reviewing a PR diff (code changes). Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-correctness.md."
 
-- INPUT: `$SESSION_DIR/input.txt`
-- OUTPUT: `$SESSION_DIR/synthesis.md`
+Task 2 — Use the Task tool with subagent_type="deepreview-security":
+"You are reviewing a PR diff (code changes). Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-security.md."
+
+Task 3 — Use the Task tool with subagent_type="deepreview-architecture":
+"You are reviewing a PR diff (code changes). Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-architecture.md."
+
+Task 4 — Use the Task tool with subagent_type="deepreview-docs":
+"You are reviewing a PR diff (code changes). Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-docs.md."
+
+Task 5 — Use the Task tool with subagent_type="deepreview-compatibility":
+"You are reviewing a PR diff (code changes). Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-compatibility.md."
+
+Wait for all 5 to return. Record which succeeded and which failed.
+
+STEP 4: DISPATCH STAGE 2 — CROSS-VALIDATION (5 parallel tasks)
+Only proceed with reviews that exist. Dispatch ALL FIVE simultaneously:
+
+Task 6 — Use the Task tool with subagent_type="deepreview-validator":
+"Your perspective: correctness. Read all review files at: $SESSION_DIR/review-correctness.md, $SESSION_DIR/review-security.md, $SESSION_DIR/review-architecture.md, $SESSION_DIR/review-docs.md, $SESSION_DIR/review-compatibility.md. Also read the original input at $SESSION_DIR/input.txt for context. Write your validated review to $SESSION_DIR/validated-correctness.md."
+
+Task 7 — Use the Task tool with subagent_type="deepreview-validator":
+"Your perspective: security. Read all review files at: $SESSION_DIR/review-correctness.md, $SESSION_DIR/review-security.md, $SESSION_DIR/review-architecture.md, $SESSION_DIR/review-docs.md, $SESSION_DIR/review-compatibility.md. Also read the original input at $SESSION_DIR/input.txt for context. Write your validated review to $SESSION_DIR/validated-security.md."
+
+Task 8 — Use the Task tool with subagent_type="deepreview-validator":
+"Your perspective: architecture. Read all review files at: $SESSION_DIR/review-correctness.md, $SESSION_DIR/review-security.md, $SESSION_DIR/review-architecture.md, $SESSION_DIR/review-docs.md, $SESSION_DIR/review-compatibility.md. Also read the original input at $SESSION_DIR/input.txt for context. Write your validated review to $SESSION_DIR/validated-architecture.md."
+
+Task 9 — Use the Task tool with subagent_type="deepreview-validator":
+"Your perspective: docs. Read all review files at: $SESSION_DIR/review-correctness.md, $SESSION_DIR/review-security.md, $SESSION_DIR/review-architecture.md, $SESSION_DIR/review-docs.md, $SESSION_DIR/review-compatibility.md. Also read the original input at $SESSION_DIR/input.txt for context. Write your validated review to $SESSION_DIR/validated-docs.md."
+
+Task 10 — Use the Task tool with subagent_type="deepreview-validator":
+"Your perspective: compatibility. Read all review files at: $SESSION_DIR/review-correctness.md, $SESSION_DIR/review-security.md, $SESSION_DIR/review-architecture.md, $SESSION_DIR/review-docs.md, $SESSION_DIR/review-compatibility.md. Also read the original input at $SESSION_DIR/input.txt for context. Write your validated review to $SESSION_DIR/validated-compatibility.md."
+
+Wait for all 5 to return.
+
+STEP 5: DISPATCH STAGE 3 — SYNTHESIS (1 task)
+Task 11 — Use the Task tool with subagent_type="deepreview-synthesizer":
+"Read the validated reviews at: $SESSION_DIR/validated-correctness.md, $SESSION_DIR/validated-security.md, $SESSION_DIR/validated-architecture.md, $SESSION_DIR/validated-docs.md, $SESSION_DIR/validated-compatibility.md (skip any that don't exist). Write the synthesis to $SESSION_DIR/synthesis.md."
+
+Record the stats line from its return.
 
 If stats show 0 critical, 0 warnings, 0 suggestions, tell the user "No findings to post. PR looks good!" and STOP.
 
-STEP 3: FORMAT THREADS (1 task)
+STEP 6: FORMAT THREADS (1 task)
 
 Get the repo owner/name:
 Run `gh repo view --json owner,name --jq '.owner.login + "/" + .name'` and save as OWNER_REPO.
@@ -37,18 +76,18 @@ Task — Use the Task tool with subagent_type="deepreview-review-formatter":
 
 Wait for it to return.
 
-STEP 4: POST REVIEW
+STEP 7: POST REVIEW
 Use the `deepreview-post-review` tool:
 
 - `threads_path`: The absolute path to `$SESSION_DIR/threads.md`
 - `pr_number`: $ARGUMENTS (the PR number)
 
-STEP 5: PRESENT RESULTS
+STEP 8: PRESENT RESULTS
 Show the user:
 
 - Session directory: $SESSION_DIR/
 - Which reviewers completed (and any that failed)
-- Stats from synthesis (the stats line from Stage 3)
+- Stats from synthesis (the stats line from Step 5)
 - Output from the posting script (how many threads posted, any demotions)
 - Remind: "The review is PENDING. Submit it via the GitHub UI when ready."
 
