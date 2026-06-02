@@ -1,5 +1,5 @@
 import { type Plugin, type PluginInput, tool } from "@opencode-ai/plugin";
-import { postReview } from "@mechanai/deepreview/api";
+import { postReview } from "../../src/post-review.ts";
 
 // oxlint-disable-next-line require-await -- Why: Plugin type signature requires async but this plugin has no async initialization
 export const server: Plugin = async (_input: PluginInput) => {
