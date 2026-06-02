@@ -83,6 +83,23 @@ its own context, keeping token usage minimal.
 - `git`
 - `gh` CLI (only for PR commands)
 
+## Upgrade
+
+OpenCode caches plugins on first install and does not automatically check for newer versions.
+To upgrade:
+
+```bash
+rm -rf ~/.cache/opencode/packages/*deepreview*/
+```
+
+Then restart OpenCode. It will re-fetch the latest version.
+
+If you installed with `--local`, also re-run the setup script to update symlinks:
+
+```bash
+bunx @mechanai/deepreview@latest/setup --local
+```
+
 > [!NOTE]
 > If upgrading from the old `npx @anthropic/deepreview install` workflow, remove
 > the old copied files first (`rm ~/.config/opencode/agents/deepreview*
