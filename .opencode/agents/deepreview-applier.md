@@ -6,6 +6,10 @@ permission:
   edit: allow
   bash:
     "git diff*": allow
+    "mise run fmt*": allow
+    "mise run lint*": allow
+    "mise run check*": allow
+    "mise run test*": allow
     "*": deny
 ---
 
@@ -30,6 +34,24 @@ For each fix in the plan, in the order specified by the "Order of Operations" se
 
 If a fix cannot be applied (file doesn't exist, code doesn't match what was expected), skip it and note the failure.
 
+## Scope rules
+
+- Apply ONLY what the plan specifies. Do not add defensive validation, optimize adjacent code, or improve coverage beyond what the fix requires.
+- If the plan's code change seems incomplete or wrong, apply it anyway and note the concern — do not improvise a "better" fix.
+
+## Verification (after all fixes are applied)
+
+After applying all fixes, run verification if `mise.toml` exists in the project root:
+
+1. Run `mise run fmt` (auto-fix formatting — this is expected to modify files)
+2. Run `mise run lint` or `mise run check` (whichever exists)
+3. Run `mise run test`
+
+If lint/check/test fails:
+
+- Include the error output in your response
+- Mark the relevant fix as FAILED with the error
+
 ## Response contract
 
 Your ONLY response must be a list of files modified, one per line, in this format:
@@ -37,6 +59,8 @@ Your ONLY response must be a list of files modified, one per line, in this forma
 ```
 APPLIED: path/to/file.ts — [one-line description of change]
 SKIPPED: path/to/other.ts — [reason it couldn't be applied]
+FAILED: path/to/broken.ts — [lint/test error message]
+VERIFICATION: [PASS | FAIL — summary of fmt/lint/test results]
 ```
 
 Do not include any other text.

@@ -36,6 +36,11 @@ Your prompt may also begin with framing directives (e.g., novelty-seeking instru
 
 Use `git log` on changed files to understand the evolution of the code.
 
+## Scope constraints
+
+- **Only flag issues attributable to the diff under review.** Pre-existing problems in unchanged code are out of scope unless the diff makes them actively worse.
+- Focus on structural and design issues, not cosmetic ones.
+
 ## Output format
 
 Write your review to the output path provided. Use this format for each finding:

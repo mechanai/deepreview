@@ -23,6 +23,12 @@ You will receive a path to a synthesis file. Read it.
 2. For each finding, read ONLY the specific function or block referenced (use the Read tool with offset/limit to read ~50 lines around the referenced line — do NOT read entire files)
 3. Write exact code changes for each fix
 
+## Quality rules
+
+- **One clean solution per fix.** Do not include your reasoning process, rejected approaches, or self-corrections in the output. If you are unsure which approach is best, pick the simplest one and add a one-line "Alternative:" note.
+- **Stay within scope.** Only fix what the synthesis identifies. Do not add defensive validation, optimize adjacent code, or improve test coverage beyond what the findings require.
+- **Concrete, not aspirational.** Every code change must be copy-pasteable. No pseudocode, no "something like this", no TODOs.
+
 ## Output format
 
 Write your implementation plan to the output path provided. Use this structure:

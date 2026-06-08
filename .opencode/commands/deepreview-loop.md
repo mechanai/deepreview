@@ -44,9 +44,20 @@ Dispatch the applier automatically — do NOT ask the user for permission.
 Use the Task tool with subagent_type="deepreview-applier":
 "Read the implementation plan at $SESSION_DIR/implementation-plan.md. Apply the fixes."
 
-Wait for the applier to return.
+Wait for the applier to return. Parse the applier's response for VERIFICATION status.
 
-STEP 5: INCREMENT AND RE-REVIEW (lightweight — NO cross-validation)
+STEP 4b: HANDLE VERIFICATION RESULTS
+If the applier reports VERIFICATION: FAIL:
+
+- Show the user the error summary from the applier's response
+- Ask: "Applied fixes failed verification (lint/test). Options: revert and skip failing fix, continue anyway, or stop?"
+- If revert: run `git checkout -- .` to undo all changes from this iteration, note which fix failed, add it to a SKIP_LIST, and re-run the planner+applier without that fix.
+- If continue: proceed to STEP 5 (the next iteration's reviewers will likely catch the introduced error).
+- If stop: STOP.
+
+If the applier reports VERIFICATION: PASS (or no verification was possible): proceed to STEP 5.
+
+STEP 5: INCREMENT AND RE-REVIEW
 Set ITERATION = ITERATION + 1
 
 If ITERATION > 5:
@@ -68,36 +79,47 @@ Prepare fresh input:
 
 Check if input.txt is empty. If empty, tell user "Nothing to review — all changes resolved." and STOP.
 
-STEP 5a: BUILD PRIOR CONTEXT
+STEP 5a: DIFF SIZE DIVERGENCE CHECK
+Compare the size of the new input.txt to the previous iteration's input.txt (in bytes or lines).
+If the new input is more than 50% larger than the previous iteration's input:
+
+- Tell the user: "Divergence warning: diff grew from ~N to ~M lines (X% increase). The applier may be adding more code than it's fixing."
+- Ask: "Continue with the larger diff, or revert last iteration's changes?"
+- If revert: run `git checkout -- .`, STOP.
+- If continue: proceed.
+
+STEP 5b: BUILD PRIOR CONTEXT
 Accumulate findings from ALL previous iterations into PRIOR_CONTEXT so no finding is re-reported.
 
-To build this, dispatch a helper task that reads ALL previous syntheses:
+To build this, dispatch a helper task that reads ALL previous syntheses AND implementation plans:
 NOTE: Interpolate the actual directory paths from ALL_SESSION_DIRS into this task string — the subagent cannot access your variables.
 Task — Use the Task tool with subagent_type="general":
-"Read the synthesis files from these directories: [LIST EACH PATH FROM ALL_SESSION_DIRS EXCLUDING CURRENT]. If any synthesis file does not exist, skip it. Extract ALL findings across them as a deduplicated Markdown list in this exact format:
+"Read the synthesis files AND implementation plan files from these directories: [LIST EACH PATH FROM ALL_SESSION_DIRS EXCLUDING CURRENT]. If any file does not exist, skip it. Extract:
 
 ## Prior Findings (already reported — do not re-report or verify)
 
 - [Short Issue Title] ([category]) — [file:line]
 
+## Applied Fixes (changes made by previous iterations — new bugs here are regressions)
+
+- [Fix title from implementation plan] — [file:line] (applied in iter N)
+
 ## Covered Regions (already examined — prioritize elsewhere)
 
 - [file:line-range] (pad each finding's file:line by 20 lines in each direction)
 
-Deduplicate findings that appear in multiple syntheses. Return ONLY these two sections, nothing else."
+Deduplicate findings that appear in multiple syntheses. Return ONLY these three sections, nothing else."
 
 Set PRIOR_CONTEXT to the returned text. Validate that it contains "## Prior Findings" — if not, warn the user ("Helper returned malformed prior context — proceeding without deduplication") and set PRIOR_CONTEXT="". If CONTEXT_FILE exists, prepend:
 "## Design Decisions (intentional — do not flag)\nThe following are deliberate design choices. Do NOT flag these as issues or suggest alternatives.\n`\n" + contents of CONTEXT_FILE + "\n`\n\n"
 
-NOW RUN A LIGHTWEIGHT REVIEW (Stages 1, 3, 4 only — NO cross-validation):
-
-The key difference: iteration 2+ skips cross-validation. This prevents validators from filtering out new issues introduced by fixes.
+STEP 5c: RUN REVIEW WITH CROSS-VALIDATION
 
 Stage 1 — DISPATCH 5 PARALLEL REVIEWERS:
 Each reviewer prompt MUST include PRIOR_CONTEXT and the novelty-seeking framing below.
 
 The REVIEWER_PREAMBLE for all iter2+ reviewers is:
-"Your goal is to find issues that PREVIOUS reviewers missed. Do NOT re-report, verify, or comment on prior findings.
+"Your goal is to find issues that PREVIOUS reviewers missed. Do NOT re-report, verify, or comment on prior findings. If you find a bug in code listed under 'Applied Fixes', flag it as a regression.
 
 $PRIOR_CONTEXT
 
@@ -130,14 +152,39 @@ Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/re
 
 Wait for all 5. Record which succeeded.
 
-Stage 3 (skip Stage 2) — DISPATCH SYNTHESIZER DIRECTLY ON RAW REVIEWS:
-Task 6 — Use the Task tool with subagent_type="deepreview-synthesizer":
-"Read the reviews at: $SESSION_DIR/review-correctness.md, $SESSION_DIR/review-security.md, $SESSION_DIR/review-architecture.md, $SESSION_DIR/review-docs.md, $SESSION_DIR/review-compatibility.md. Write the synthesis to $SESSION_DIR/synthesis.md."
+STEP 5d: VERIFY REVIEWER OUTPUT
+Check how many review files were actually written. Run: `ls $SESSION_DIR/review-*.md 2>/dev/null | wc -l`
+
+- If 0 files exist: Tell the user "All reviewers failed to produce output. This usually means the diff is too large for subagent context windows or there was an infrastructure failure." STOP.
+- If 1-2 files exist: Warn the user "Only N/5 reviewers produced output. Proceeding with partial results." Continue with what exists.
+- If 3+ files exist: Proceed normally.
+
+Stage 2 — DISPATCH 5 PARALLEL VALIDATORS (cross-validation):
+Task 6 — Use the Task tool with subagent_type="deepreview-validator":
+"Your perspective: correctness. Read all review files at: $SESSION_DIR/review-correctness.md, $SESSION_DIR/review-security.md, $SESSION_DIR/review-architecture.md, $SESSION_DIR/review-docs.md, $SESSION_DIR/review-compatibility.md. Also read the original input at $SESSION_DIR/input.txt for context. Write your validated review to $SESSION_DIR/validated-correctness.md."
+
+Task 7 — Use the Task tool with subagent_type="deepreview-validator":
+"Your perspective: security. Read all review files at: $SESSION_DIR/review-correctness.md, $SESSION_DIR/review-security.md, $SESSION_DIR/review-architecture.md, $SESSION_DIR/review-docs.md, $SESSION_DIR/review-compatibility.md. Also read the original input at $SESSION_DIR/input.txt for context. Write your validated review to $SESSION_DIR/validated-security.md."
+
+Task 8 — Use the Task tool with subagent_type="deepreview-validator":
+"Your perspective: architecture. Read all review files at: $SESSION_DIR/review-correctness.md, $SESSION_DIR/review-security.md, $SESSION_DIR/review-architecture.md, $SESSION_DIR/review-docs.md, $SESSION_DIR/review-compatibility.md. Also read the original input at $SESSION_DIR/input.txt for context. Write your validated review to $SESSION_DIR/validated-architecture.md."
+
+Task 9 — Use the Task tool with subagent_type="deepreview-validator":
+"Your perspective: docs. Read all review files at: $SESSION_DIR/review-correctness.md, $SESSION_DIR/review-security.md, $SESSION_DIR/review-architecture.md, $SESSION_DIR/review-docs.md, $SESSION_DIR/review-compatibility.md. Also read the original input at $SESSION_DIR/input.txt for context. Write your validated review to $SESSION_DIR/validated-docs.md."
+
+Task 10 — Use the Task tool with subagent_type="deepreview-validator":
+"Your perspective: compatibility. Read all review files at: $SESSION_DIR/review-correctness.md, $SESSION_DIR/review-security.md, $SESSION_DIR/review-architecture.md, $SESSION_DIR/review-docs.md, $SESSION_DIR/review-compatibility.md. Also read the original input at $SESSION_DIR/input.txt for context. Write your validated review to $SESSION_DIR/validated-compatibility.md."
+
+Wait for all 5 to return.
+
+Stage 3 — DISPATCH SYNTHESIZER:
+Task 11 — Use the Task tool with subagent_type="deepreview-synthesizer":
+"Read the validated reviews at: $SESSION_DIR/validated-correctness.md, $SESSION_DIR/validated-security.md, $SESSION_DIR/validated-architecture.md, $SESSION_DIR/validated-docs.md, $SESSION_DIR/validated-compatibility.md (skip any that don't exist). Write the synthesis to $SESSION_DIR/synthesis.md."
 
 Record the stats line.
 
 Stage 4 — DISPATCH PLANNER:
-Task 7 — Use the Task tool with subagent_type="deepreview-planner":
+Task 12 — Use the Task tool with subagent_type="deepreview-planner":
 "Read the synthesis at $SESSION_DIR/synthesis.md. Write the implementation plan to $SESSION_DIR/implementation-plan.md."
 
 Record the summary line.
@@ -160,8 +207,9 @@ IMPORTANT RULES:
 - Use ONLY the file paths and stats/summary lines returned by subagents.
 - Apply ALL findings (critical, warning, AND suggestion) — the goal is a clean review.
 - Do NOT ask the user for permission to apply fixes. Apply automatically.
-- DO ask the user if iteration limit is hit or deadlock is detected.
-- Iteration 2+ MUST skip cross-validation, MUST include PRIOR_CONTEXT, and MUST use novelty-seeking framing.
+- DO ask the user if: iteration limit is hit, deadlock is detected, verification fails, or diff size diverges.
+- Iteration 2+ MUST include cross-validation, MUST include PRIOR_CONTEXT, and MUST use novelty-seeking framing.
 - Iteration 2+ MUST NOT tell reviewers to "verify" or "check status of" prior findings.
 - Each iteration uses a NEW session directory — never reuse a previous one.
 - If --context file is provided, include its contents under "Design Decisions" in PRIOR_CONTEXT for ALL iterations (including iter1).
+- If all reviewers produce zero output files, STOP immediately — do not continue to synthesis.
