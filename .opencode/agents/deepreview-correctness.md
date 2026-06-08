@@ -38,6 +38,11 @@ Your prompt may also begin with framing directives (e.g., novelty-seeking instru
 
 Use `git blame` and `git log` on changed files to understand intent when unclear.
 
+## Scope constraints
+
+- **Only flag issues attributable to the diff under review.** Pre-existing bugs in unchanged code are out of scope unless the diff makes them actively worse.
+- Focus on correctness of the new/changed code, not unrelated pre-existing issues.
+
 ## Output format
 
 Write your review to the output path provided. Use this format for each finding:

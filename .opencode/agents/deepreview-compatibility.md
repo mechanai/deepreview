@@ -38,6 +38,10 @@ Your prompt may also begin with framing directives (e.g., novelty-seeking instru
 
 Use `git log` and `git show` to check if removed/changed items had external consumers.
 
+## Scope constraints
+
+- **Only flag issues attributable to the diff under review.** Pre-existing compatibility concerns in unchanged code are out of scope unless the diff makes them actively worse.
+
 ## Output format
 
 Write your review to the output path provided. Use this format for each finding:

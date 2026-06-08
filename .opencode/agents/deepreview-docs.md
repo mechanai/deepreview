@@ -49,9 +49,15 @@ Write your review to the output path provided. Use this format for each finding:
 
 Severity guide:
 
-- **critical:** Doc/comment claims something false about the code (will mislead developers or users)
+- **critical:** Doc/comment claims something false that would cause an implementer to build the wrong thing or misuse an API. Stale wording that is obviously outdated (and thus unlikely to mislead) is NOT critical.
 - **warning:** Duplicate or stale content that wastes reader attention
 - **suggestion:** Verbose text that could be tightened
+
+## Scope constraints
+
+- **Only flag issues attributable to the diff under review.** Pre-existing documentation problems in unchanged code are out of scope unless the diff makes them actively worse.
+- **ADRs (Architecture Decision Records) are historical documents.** Do not flag them for being "stale" — they record the decision at the time it was made. Only flag ADRs if the diff explicitly modifies them and introduces inconsistencies.
+- **Test code cosmetics** (test function names, test descriptions) are suggestions at most, never warnings or critical.
 
 If you find no issues, write: "No documentation issues found."
 
