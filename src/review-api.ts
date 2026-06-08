@@ -64,7 +64,15 @@ async function fetchRemainingComments(
   const comments: ReviewComment[] = [];
   let pageInfo = initialPageInfo;
   let pages = 0;
+  // 5 minute aggregate timeout for pagination
+  const deadline = Date.now() + 5 * 60 * 1000;
   while (pageInfo.hasNextPage && pages++ < MAX_PAGES) {
+    if (Date.now() > deadline) {
+      console.warn(
+        `WARN: Aggregate timeout reached after ${pages} pages. Returning partial results.`,
+      );
+      break;
+    }
     const page = await graphql<CommentsPage>(
       `
         query ($reviewId: ID!, $after: String!) {

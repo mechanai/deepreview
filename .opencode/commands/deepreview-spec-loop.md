@@ -11,7 +11,7 @@ STEP 1: DETERMINE INPUT
 - If remaining "$ARGUMENTS" is empty, tell the user "Usage: /deepreview-spec-loop [--context <file>] <file1> [file2 ...]" and STOP.
 - Set FILES="$ARGUMENTS"
 - Set ITERATION=1
-- Set PRIOR_CONTEXT="" (empty — built up across iterations)
+- Set PRIOR_CONTEXT="" (empty — built up across iterations; holds both design context and prior findings)
 - Set ALL_SESSION_DIRS=[] (list of all session directories used, in order)
 - If CONTEXT_FILE exists, set PRIOR_CONTEXT="## Design Decisions (intentional — do not flag)\nThe following are deliberate design choices. Do NOT flag these as issues or suggest alternatives.\n`\n" + contents of CONTEXT_FILE + "\n`\n\n"
 
@@ -81,7 +81,7 @@ Task — Use the Task tool with subagent_type="general":
 
 Deduplicate findings that appear in multiple syntheses. Return ONLY these two sections, nothing else."
 
-Set PRIOR_CONTEXT to the returned text. If CONTEXT_FILE exists, prepend:
+Set PRIOR_CONTEXT to the returned text. Validate that it contains "## Prior Findings" — if not, warn the user ("Helper returned malformed prior context — proceeding without deduplication") and set PRIOR_CONTEXT="". If CONTEXT_FILE exists, prepend:
 "## Design Decisions (intentional — do not flag)\nThe following are deliberate design choices. Do NOT flag these as issues or suggest alternatives.\n`\n" + contents of CONTEXT_FILE + "\n`\n\n"
 
 The REVIEWER_PREAMBLE for all iter2+ reviewers is:

@@ -22,18 +22,34 @@ Read both files.
 ## Process
 
 1. Read the synthesis and identify every individual finding (each bullet or paragraph that describes a distinct issue)
-2. For each finding, determine:
+2. If the synthesis contains an "Overall Assessment" section, emit it as the **first document** with frontmatter `summary: true` (no `path` or `line`). The body should be the assessment text, lightly edited for brevity.
+3. For each finding, determine:
    - `path`: the file path (relative to repo root) the finding refers to
    - `line`: the specific line number (new-side of diff). If the synthesis gives a range, use the end line.
    - `startLine`: if the finding spans multiple lines, use the start of the range. Omit if single-line.
-3. Read `input.txt` (the diff) to:
+4. Read `input.txt` (the diff) to:
    - Verify line references are correct
    - Generate ` ```suggestion ` blocks where a concrete fix is obvious and fits within the diff
-4. Write each finding as a document in the output file
+5. Write each finding as a document in the output file
 
 ## Output format
 
-Write to the output path provided. Use this exact format — one document per finding, separated by `---`:
+Write to the output path provided. The file has two parts:
+
+### 1. Summary document (first, when synthesis has an Overall Assessment)
+
+If the synthesis contains an "Overall Assessment" section, the first document must have `summary: true` in its frontmatter. Its body is a 2-3 sentence overall assessment. This appears as the review body on GitHub. Omit this document only if the synthesis has no assessment section.
+
+```
+---
+summary: true
+---
+<2-3 sentence overall assessment from the synthesis>
+```
+
+### 2. Finding documents (one per finding)
+
+Each finding follows the summary, separated by `---`:
 
 ```
 ---
@@ -49,7 +65,7 @@ line: <line number>
 - One finding per document. Never bundle multiple issues.
 - No stats, severity counts, or framing ("3 critical issues found")
 - No references to local file paths, session directories, AI tooling, or the deepreview pipeline
-- Use permalinks for code references: `https://github.com/OWNER/REPO/blob/$PR_HEAD_SHA/<path>#L<line>`
+- Use permalinks for code references: `https://github.com/OWNER/REPO/blob/<PR_HEAD_SHA>/<path>#L<line>`
   - Get OWNER/REPO from the diff header or from `input.txt` context
 - Use ` ```suggestion ` blocks where a concrete fix is obvious
 - American English. Succinct. No filler.

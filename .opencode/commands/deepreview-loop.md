@@ -8,13 +8,14 @@ STEP 1: DETERMINE INPUT MODE
 Parse "$ARGUMENTS" the same way as /deepreview:
 
 - If it starts with `--context <path>`, extract CONTEXT_FILE=<path> and remove it from $ARGUMENTS before parsing the rest.
-- Validate CONTEXT_FILE: it must be a relative path (no leading `/`), must not contain `..`, must exist on disk, and must be a regular file (not a directory or symlink to outside the project), and must be under 50KB. If validation fails, tell the user the error and STOP.
+- Validate `CONTEXT_FILE`: it must be a relative path (no leading `/`), must not contain `..`, must exist on disk, and must be a regular file (not a directory or symlink to outside the project), and must be under 50KB. If validation fails, tell the user the error and STOP.
+  _(Canonical source for `CONTEXT_FILE` validation rules. Keep `deepreview.md`, `deepreview-spec.md`, and `deepreview-spec-loop.md` in sync.)_
 - If it is a number → MODE=pr, TARGET="$ARGUMENTS"
 - If it is a file path or multiple file paths → MODE=files, TARGET="$ARGUMENTS"
 - If it is empty → MODE=branch, TARGET=""
 
 Set ITERATION=1
-Set PRIOR_CONTEXT="" (empty — built up across iterations)
+Set PRIOR_CONTEXT="" (empty — built up across iterations; holds both design context and prior findings)
 Set ALL_SESSION_DIRS=[] (list of all session directories used, in order)
 
 If CONTEXT_FILE exists, read its contents and set PRIOR_CONTEXT to:
