@@ -48,6 +48,7 @@ jobs:
         id: version
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_PR_NUMBER: ${{ github.event.pull_request.number }}
         run: .github/scripts/version-preview.sh
 
       - name: Job summary

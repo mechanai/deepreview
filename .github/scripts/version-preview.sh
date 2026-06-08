@@ -9,11 +9,19 @@ set -euo pipefail
 DEFAULT_BRANCH="${GITHUB_BASE_REF:-main}"
 PR_SHA=$(git rev-parse HEAD)
 
+# Use the PR title as the squash commit subject, matching GitHub's default
+# squash-merge behavior. Fall back to the first commit subject if unavailable.
+PR_NUMBER="${GITHUB_PR_NUMBER:-}"
+if [ -n "$PR_NUMBER" ]; then
+  PR_TITLE=$(gh pr view "$PR_NUMBER" --json title --jq .title)
+else
+  PR_TITLE=$(git log "${DEFAULT_BRANCH}".."${PR_SHA}" --reverse --format=%s | head -1)
+fi
+
 # Squash-merge PR onto default branch to simulate post-merge state
 git config user.name "CI"
 git config user.email "ci@localhost"
 git checkout "$DEFAULT_BRANCH"
-COMMIT_MESSAGE=$(git log "${DEFAULT_BRANCH}".."${PR_SHA}" --reverse --format=%B)
 
 if git diff --quiet "$PR_SHA"; then
   echo "will_release=false" >> "$GITHUB_OUTPUT"
@@ -23,7 +31,7 @@ if git diff --quiet "$PR_SHA"; then
 fi
 
 git merge --squash "$PR_SHA"
-git commit --no-verify -m "$COMMIT_MESSAGE"
+git commit --no-verify -m "$PR_TITLE"
 
 # Update origin ref to match our simulated merge so semantic-release's
 # git push --dry-run check sees them as equal.
