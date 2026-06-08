@@ -22,8 +22,18 @@ interface FileHunks {
  * Tier 2: file-level (file in diff but line not in any hunk)
  * Tier 3: review body (file not in diff)
  */
+// 5MB — diffs larger than this are truncated before parsing
+const MAX_DIFF_SIZE = 5 * 1024 * 1024;
+
 export function classifyFindings(findings: Finding[], diffText: string): ClassifiedFinding[] {
-  const parsed = parseDiff(diffText);
+  let effectiveDiff = diffText;
+  if (diffText.length > MAX_DIFF_SIZE) {
+    console.warn(
+      `WARN: Diff size (${(diffText.length / 1024 / 1024).toFixed(1)}MB) exceeds ${MAX_DIFF_SIZE / 1024 / 1024}MB limit. Truncating — some findings may be demoted to tier 3.`,
+    );
+    effectiveDiff = diffText.slice(0, MAX_DIFF_SIZE);
+  }
+  const parsed = parseDiff(effectiveDiff);
   const fileMap = buildFileMap(parsed);
 
   return findings.map((finding) => {
