@@ -2,6 +2,12 @@ import matter from "gray-matter";
 import yaml from "js-yaml";
 import type { Finding } from "./diff-classifier.ts";
 
+/** @internal Not part of the public API — subject to change without notice. */
+export interface ParsedThreads {
+  findings: Finding[];
+  summary?: string;
+}
+
 /**
  * gray-matter engine restricted to safe YAML parsing (no !!js/function etc.).
  * FAILSAFE_SCHEMA returns all scalars as strings — numeric fields (line, startLine)
@@ -16,11 +22,13 @@ const safeYamlEngine = (s: string): Record<string, unknown> => {
 const matterOptions = { engines: { yaml: safeYamlEngine } };
 
 /**
- * Parse a threads.md file into an array of finding objects.
- * The file uses --- separators between findings, each with YAML frontmatter.
+ * Parse a threads.md file into findings and an optional summary.
+ * The file uses --- separators between documents, each with YAML frontmatter.
+ * A document with `summary: true` in its frontmatter is extracted as the review summary.
  */
-function parseThreads(content: string): Finding[] {
+function parseThreads(content: string): ParsedThreads {
   const findings: Finding[] = [];
+  let summary: string | undefined;
   const documents = splitDocuments(content);
 
   for (const doc of documents) {
@@ -33,6 +41,16 @@ function parseThreads(content: string): Finding[] {
       continue;
     }
     const data = parsed.data as Record<string, unknown>;
+
+    // Handle summary documents
+    if (String(data.summary).toLowerCase() === "true") {
+      if (summary !== undefined) {
+        console.warn("WARN: Multiple summary documents found — using the last one.");
+      }
+      summary = parsed.content.trim();
+      continue;
+    }
+
     const path = typeof data.path === "string" ? data.path : undefined;
     const lineNum = Number(data.line);
     if (path === undefined || path === "" || !Number.isFinite(lineNum) || lineNum < 1) {
@@ -56,7 +74,7 @@ function parseThreads(content: string): Finding[] {
     });
   }
 
-  return findings;
+  return { findings, summary };
 }
 
 const YAML_KEY_RE = /^\w[\w\s]*:/u;
