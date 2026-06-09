@@ -18,13 +18,16 @@ Set ITERATION=1
 Set PRIOR_CONTEXT="" (empty — built up across iterations; holds both design context and prior findings)
 Set ALL_SESSION_DIRS=[] (list of all session directories used, in order)
 
+Determine REPO_ROOT — the main repository root (not a worktree root). Run:
+`REPO_ROOT=$(realpath "$(git rev-parse --git-common-dir)" | sed 's|/\.git$||')`
+
 If CONTEXT_FILE exists, read its contents and set PRIOR_CONTEXT to:
 "## Design Decisions (intentional — do not flag)\nThe following are deliberate design choices. Do NOT flag these as issues or suggest alternatives.\n`\n" + contents of CONTEXT_FILE + "\n`\n"
 
 STEP 2: RUN INITIAL DEEPREVIEW (full pipeline with cross-validation)
 Run the full deepreview pipeline (Stages 1-5 from the deepreview command):
 
-- Determine SESSION_DIR and write input.txt
+- Determine SESSION_DIR=`$REPO_ROOT/.ai/deepreview/loop-iter$ITERATION-$(date +%Y-%m-%d-%H%M%S)` and write input.txt
 - Append SESSION_DIR to ALL_SESSION_DIRS
 - Stage 1: 5 parallel reviewers — prepend PRIOR_CONTEXT (if non-empty) to each reviewer's prompt as "${PRIOR_CONTEXT}You are reviewing ... Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-{perspective}.md."
 - Stage 2: 5 parallel validators (cross-validation)
@@ -68,7 +71,7 @@ If ITERATION > 5:
 - If user says stop → STOP.
 - If user says continue → reset limit to ITERATION + 5 and proceed.
 
-Create new session directory: SESSION_DIR=".ai/deepreview/loop-iter$ITERATION-$(date +%Y-%m-%d-%H%M%S)"
+Create new session directory: SESSION_DIR="$REPO_ROOT/.ai/deepreview/loop-iter$ITERATION-$(date +%Y-%m-%d-%H%M%S)"
 Run `mkdir -p $SESSION_DIR`
 Append SESSION_DIR to ALL_SESSION_DIRS
 
