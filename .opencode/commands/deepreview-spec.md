@@ -8,7 +8,9 @@ STEP 1: DETERMINE SESSION DIRECTORY
 
 - If "$ARGUMENTS" starts with `--context <path>`, extract CONTEXT_FILE=<path> and remove it from $ARGUMENTS before parsing the rest.
 - Validate CONTEXT_FILE: it must be a relative path (no leading `/`), must not contain `..`, must exist on disk, and must be a regular file (not a directory or symlink to outside the project), and must be under 50KB. If validation fails, tell the user the error and STOP.
-- Set SESSION_DIR=".ai/deepreview/spec-$(date +%Y-%m-%d-%H%M%S)"
+- Determine REPO_ROOT — the main repository root (not a worktree root). Run:
+  `REPO_ROOT=$(realpath "$(git rev-parse --git-common-dir)" | sed 's|/\.git$||')`
+- Set SESSION_DIR="$REPO_ROOT/.ai/deepreview/spec-$(date +%Y-%m-%d-%H%M%S)"
 - Create the directory with `mkdir -p $SESSION_DIR`
 
 STEP 2: PREPARE INPUT

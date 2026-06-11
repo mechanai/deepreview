@@ -14,11 +14,14 @@ Classify "$ARGUMENTS":
 - If it is multiple space-separated file paths → MODE=files
 - If it is empty → MODE=branch
 
+Determine REPO_ROOT — the main repository root (not a worktree root). Run:
+`REPO_ROOT=$(realpath "$(git rev-parse --git-common-dir)" | sed 's|/\.git$||')`
+
 Set SESSION_DIR based on mode:
 
-- MODE=pr: SESSION_DIR=".ai/deepreview/$ARGUMENTS-$(date +%Y-%m-%d)"
-- MODE=files: SESSION_DIR=".ai/deepreview/files-$(date +%Y-%m-%d-%H%M%S)"
-- MODE=branch: SESSION_DIR=".ai/deepreview/$(git branch --show-current)-$(date +%Y-%m-%d)"
+- MODE=pr: SESSION_DIR="$REPO_ROOT/.ai/deepreview/$ARGUMENTS-$(date +%Y-%m-%d)"
+- MODE=files: SESSION_DIR="$REPO_ROOT/.ai/deepreview/files-$(date +%Y-%m-%d-%H%M%S)"
+- MODE=branch: SESSION_DIR="$REPO_ROOT/.ai/deepreview/$(git branch --show-current)-$(date +%Y-%m-%d)"
 
 Create the directory with `mkdir -p $SESSION_DIR`
 
