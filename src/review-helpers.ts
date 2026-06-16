@@ -143,8 +143,9 @@ export function classifyAndLog(
   // Tier-2 findings are posted as file-level comments where suggestion blocks
   // render as inert code — strip them unconditionally.
   for (const f of tier2) {
-    if (SUGGESTION_OPEN_RE.test(f.body)) {
-      f.renderedBody = stripSuggestionBlocks(f.body);
+    const stripped = stripSuggestionBlocks(f.body);
+    if (stripped !== f.body) {
+      f.renderedBody = stripped;
     }
   }
   return { tier1, tier2, tier3 };
@@ -162,7 +163,7 @@ function maxSuggestionLines(body: string): number {
     if (!inSuggestion && SUGGESTION_OPEN_RE.test(line.trim())) {
       inSuggestion = true;
       count = 0;
-    } else if (inSuggestion && line === "```") {
+    } else if (inSuggestion && line.trimEnd() === "```") {
       inSuggestion = false;
       max = Math.max(max, count);
     } else if (inSuggestion) {
@@ -187,7 +188,7 @@ function stripSuggestionBlocks(body: string): string {
     if (!inSuggestion && SUGGESTION_OPEN_RE.test(line.trim())) {
       inSuggestion = true;
       pendingBlock = [line];
-    } else if (inSuggestion && line === "```") {
+    } else if (inSuggestion && line.trimEnd() === "```") {
       inSuggestion = false;
       pendingBlock = [];
     } else if (inSuggestion) {
@@ -203,6 +204,10 @@ function stripSuggestionBlocks(body: string): string {
   return result.join("\n");
 }
 
+function anchorLineCount(f: Finding): number {
+  return f.startLine === undefined ? 1 : Math.max(1, f.line - f.startLine + 1);
+}
+
 /**
  * Identify tier-1 findings whose largest suggestion block exceeds the anchor range.
  * Returns a Set of findings that need their suggestion blocks stripped.
@@ -213,7 +218,7 @@ function findingsExceedingAnchor(findings: ClassifiedFinding[]): Set<ClassifiedF
     if (f.tier !== 1) continue;
     const suggLines = maxSuggestionLines(f.body);
     if (suggLines === 0) continue;
-    const anchorLines = f.startLine === undefined ? 1 : Math.max(1, f.line - f.startLine + 1);
+    const anchorLines = anchorLineCount(f);
     if (suggLines > anchorLines) {
       exceeded.add(f);
     }
@@ -229,7 +234,7 @@ export function formatSuggestionWarnings(oversized: Set<ClassifiedFinding>): str
   const warnings: string[] = [];
   for (const f of oversized) {
     const suggLines = maxSuggestionLines(f.body);
-    const anchorLines = f.startLine === undefined ? 1 : Math.max(1, f.line - f.startLine + 1);
+    const anchorLines = anchorLineCount(f);
     const anchor =
       f.startLine === undefined ? `${f.path}:${f.line}` : `${f.path}:${f.startLine}-${f.line}`;
     warnings.push(

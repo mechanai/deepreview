@@ -9,7 +9,7 @@ export interface Finding {
 
 export interface ClassifiedFinding extends Finding {
   tier: 1 | 2 | 3;
-  /** Body with oversized suggestion blocks stripped. Used for rendering; original `body` is used for ID computation. */
+  /** Body with suggestion blocks stripped for rendering. Set for tier-1 findings with oversized suggestions and all tier-2 findings containing suggestions. Original `body` is used for ID computation. Set in review-helpers.ts, not in classifyFindings. */
   renderedBody?: string;
 }
 
