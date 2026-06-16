@@ -88,7 +88,7 @@ Before writing a suggestion:
 3. Set `startLine` to the first line being replaced and `line` to the last
 4. The anchor range (startLine..line) MUST cover all original lines being removed or modified. The suggestion may be shorter than the anchor range (deletions are fine), but should not be longer — if your replacement has more lines than the anchor covers, widen the anchor to include all affected lines.
 
-Example — replacing a 5-line callout block (lines 246-250):
+Example — replacing a 5-line callout block (lines 246-250). Note: use exactly three backticks for suggestion blocks in output — the four-backtick fence below is only for illustration:
 
 ````
 ---
@@ -107,6 +107,7 @@ Common mistakes to avoid:
 - Anchoring to a single line inside a multi-line block (e.g., `line: 247` when replacing lines 246-250) — this duplicates surrounding lines when applied
 - Including lines in the suggestion body that already exist outside the anchor range — this creates duplicates
 - If you cannot determine the exact replacement scope from the diff, use prose instead of a suggestion block
+- As a safety net, the posting pipeline strips suggestion blocks that exceed the anchor range — if your suggestion disappears, widen the anchor
 
 ## Response contract
 

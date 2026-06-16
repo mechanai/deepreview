@@ -128,14 +128,22 @@ export function classifyAndLog(
   for (const f of tier3) {
     console.warn(`WARN: ${f.path}:${f.line} demoted to review body`);
   }
-  const suggestionWarnings = validateSuggestionAnchors(classified);
+  // Identify findings whose suggestion blocks exceed the anchor range
+  const oversized = findingsExceedingAnchor(classified);
+  const suggestionWarnings = formatSuggestionWarnings(oversized);
   for (const w of suggestionWarnings) {
     console.warn(w);
   }
-  // Strip all suggestion blocks from findings where the largest block exceeds the anchor range
-  const oversized = findingsExceedingAnchor(classified);
+  // Strip oversized suggestion blocks from tier-1 findings
   for (const f of tier1) {
     if (oversized.has(f)) {
+      f.renderedBody = stripSuggestionBlocks(f.body);
+    }
+  }
+  // Tier-2 findings are posted as file-level comments where suggestion blocks
+  // render as inert code — strip them unconditionally.
+  for (const f of tier2) {
+    if (SUGGESTION_OPEN_RE.test(f.body)) {
       f.renderedBody = stripSuggestionBlocks(f.body);
     }
   }
@@ -143,7 +151,7 @@ export function classifyAndLog(
 }
 
 /**
- * Count lines inside each ```suggestion block in a finding body.
+ * Find the largest ```suggestion block in a finding body by line count.
  * Returns the maximum line count across all suggestion blocks, or 0 if none.
  */
 function maxSuggestionLines(body: string): number {
@@ -154,7 +162,7 @@ function maxSuggestionLines(body: string): number {
     if (!inSuggestion && SUGGESTION_OPEN_RE.test(line.trim())) {
       inSuggestion = true;
       count = 0;
-    } else if (inSuggestion && line.trim() === "```") {
+    } else if (inSuggestion && line === "```") {
       inSuggestion = false;
       max = Math.max(max, count);
     } else if (inSuggestion) {
@@ -179,7 +187,7 @@ function stripSuggestionBlocks(body: string): string {
     if (!inSuggestion && SUGGESTION_OPEN_RE.test(line.trim())) {
       inSuggestion = true;
       pendingBlock = [line];
-    } else if (inSuggestion && line.trim() === "```") {
+    } else if (inSuggestion && line === "```") {
       inSuggestion = false;
       pendingBlock = [];
     } else if (inSuggestion) {
@@ -214,16 +222,11 @@ function findingsExceedingAnchor(findings: ClassifiedFinding[]): Set<ClassifiedF
 }
 
 /**
- * Validate that suggestion blocks fit within their anchor ranges.
- * Returns warning messages for findings where the suggestion has more lines
- * than the anchor range (startLine..line), which often indicates the anchor
- * should be widened to cover all lines being replaced.
- *
- * Only checks tier 1 findings (line-level comments with actual anchors).
+ * Format warning messages for findings whose suggestion blocks exceed their anchor range.
+ * @internal
  */
-export function validateSuggestionAnchors(findings: ClassifiedFinding[]): string[] {
+export function formatSuggestionWarnings(oversized: Set<ClassifiedFinding>): string[] {
   const warnings: string[] = [];
-  const oversized = findingsExceedingAnchor(findings);
   for (const f of oversized) {
     const suggLines = maxSuggestionLines(f.body);
     const anchorLines = f.startLine === undefined ? 1 : Math.max(1, f.line - f.startLine + 1);
@@ -234,4 +237,12 @@ export function validateSuggestionAnchors(findings: ClassifiedFinding[]): string
     );
   }
   return warnings;
+}
+
+/**
+ * Validate that suggestion blocks fit within their anchor ranges.
+ * @internal
+ */
+export function validateSuggestionAnchors(findings: ClassifiedFinding[]): string[] {
+  return formatSuggestionWarnings(findingsExceedingAnchor(findings));
 }
