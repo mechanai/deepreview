@@ -148,6 +148,14 @@ export function classifyAndLog(
       f.renderedBody = stripped;
     }
   }
+  // Tier-3 findings are posted inside the review body where suggestion blocks
+  // render as inert code — strip them unconditionally.
+  for (const f of tier3) {
+    const stripped = stripSuggestionBlocks(f.body);
+    if (stripped !== f.body) {
+      f.renderedBody = stripped;
+    }
+  }
   return { tier1, tier2, tier3 };
 }
 
