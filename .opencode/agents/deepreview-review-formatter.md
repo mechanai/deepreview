@@ -86,7 +86,7 @@ Before writing a suggestion:
 1. Identify the exact lines in the diff that will be replaced by the suggestion content
 2. Count those lines — this is your replacement scope
 3. Set `startLine` to the first line being replaced and `line` to the last
-4. The number of lines in your suggestion block can differ from the anchor range (GitHub handles insertions and deletions), but the anchor must cover all original lines being removed or modified
+4. The anchor range (startLine..line) MUST cover all original lines being removed or modified. The suggestion may be shorter than the anchor range (deletions are fine), but should not be longer — if your replacement has more lines than the anchor covers, widen the anchor to include all affected lines.
 
 Example — replacing a 5-line callout block (lines 246-250):
 

@@ -132,6 +132,15 @@ export function classifyAndLog(
   for (const w of suggestionWarnings) {
     console.warn(w);
   }
+  // Strip malformed suggestion blocks so they don't produce broken "Apply suggestion" buttons
+  for (const f of tier1) {
+    const suggLines = maxSuggestionLines(f.body);
+    if (suggLines === 0) continue;
+    const anchorLines = f.startLine === undefined ? 1 : f.line - f.startLine + 1;
+    if (suggLines > anchorLines) {
+      f.body = stripSuggestionBlocks(f.body);
+    }
+  }
   return { tier1, tier2, tier3 };
 }
 
@@ -154,14 +163,36 @@ function maxSuggestionLines(body: string): number {
       count++;
     }
   }
+  if (inSuggestion) {
+    max = Math.max(max, count);
+  }
   return max;
+}
+
+/**
+ * Remove all ```suggestion blocks from a finding body, preserving other content.
+ */
+function stripSuggestionBlocks(body: string): string {
+  const lines = body.split("\n");
+  const result: string[] = [];
+  let inSuggestion = false;
+  for (const line of lines) {
+    if (!inSuggestion && SUGGESTION_OPEN_RE.test(line.trim())) {
+      inSuggestion = true;
+    } else if (inSuggestion && line.trim() === "```") {
+      inSuggestion = false;
+    } else if (!inSuggestion) {
+      result.push(line);
+    }
+  }
+  return result.join("\n");
 }
 
 /**
  * Validate that suggestion blocks fit within their anchor ranges.
  * Returns warning messages for findings where the suggestion has more lines
- * than the anchor range (startLine..line), which would cause GitHub's
- * "Apply suggestion" button to duplicate surrounding lines.
+ * than the anchor range (startLine..line), which often indicates the anchor
+ * should be widened to cover all lines being replaced.
  *
  * Only checks tier 1 findings (line-level comments with actual anchors).
  */
@@ -176,7 +207,7 @@ export function validateSuggestionAnchors(findings: ClassifiedFinding[]): string
       const anchor =
         f.startLine === undefined ? `${f.path}:${f.line}` : `${f.path}:${f.startLine}-${f.line}`;
       warnings.push(
-        `WARN: ${anchor} has ${anchorLines}-line anchor but ${suggLines}-line suggestion — GitHub "Apply suggestion" will produce duplicated lines`,
+        `WARN: ${anchor} has ${anchorLines}-line anchor but ${suggLines}-line suggestion — anchor should be widened to cover all lines being replaced`,
       );
     }
   }
