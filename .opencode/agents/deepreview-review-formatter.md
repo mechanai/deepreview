@@ -77,6 +77,37 @@ line: <line number>
 - If the synthesis says "line 42" but looking at the diff that corresponds to a different new-side line, use the correct new-side line
 - If you cannot determine an exact line, use the first line of the relevant function/block
 
+## Suggestion block rules
+
+When a finding contains a ` ```suggestion ` block, the `startLine..line` anchor MUST cover every line that the suggestion replaces — not just the line referenced in the synthesis.
+
+Before writing a suggestion:
+
+1. Identify the exact lines in the diff that will be replaced by the suggestion content
+2. Count those lines — this is your replacement scope
+3. Set `startLine` to the first line being replaced and `line` to the last
+4. The number of lines in your suggestion block can differ from the anchor range (GitHub handles insertions and deletions), but the anchor must cover all original lines being removed or modified
+
+Example — replacing a 5-line callout block (lines 246-250):
+
+````
+---
+path: docs/migration.md
+startLine: 246
+line: 250
+---
+```suggestion
+> [!WARNING]
+> The actual default is 1 MB, not 10 MB.
+```
+````
+
+Common mistakes to avoid:
+
+- Anchoring to a single line inside a multi-line block (e.g., `line: 247` when replacing lines 246-250) — this duplicates surrounding lines when applied
+- Including lines in the suggestion body that already exist outside the anchor range — this creates duplicates
+- If you cannot determine the exact replacement scope from the diff, use prose instead of a suggestion block
+
 ## Response contract
 
 After writing the threads file, your ONLY response must be the absolute path to your output file and a count line (e.g., "12 threads written"). Do not summarize findings.
