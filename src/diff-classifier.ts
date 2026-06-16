@@ -9,6 +9,8 @@ export interface Finding {
 
 export interface ClassifiedFinding extends Finding {
   tier: 1 | 2 | 3;
+  /** Body with oversized suggestion blocks stripped. Used for rendering; original `body` is used for ID computation. */
+  renderedBody?: string;
 }
 
 interface FileHunks {

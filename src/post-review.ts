@@ -65,7 +65,7 @@ async function updateExistingThreads(
     const batch = toUpdate.slice(i, i + CONCURRENCY);
     await Promise.all(
       batch.map(async ({ finding, commentId, id }) => {
-        const body = embedFindingId(finding.body, id);
+        const body = embedFindingId(finding.renderedBody ?? finding.body, id);
         await updateReviewComment(commentId, body);
       }),
     );
@@ -147,7 +147,7 @@ async function postInlineThreads(
       batch.map(async (f) => {
         const id = findingId(f.path, f.startLine, f.line, f.body);
         // Body rendered by GitHub's Markdown sanitizer; no escaping needed here
-        const body = embedFindingId(f.body, id);
+        const body = embedFindingId(f.renderedBody ?? f.body, id);
         const ok = await postWithRetry(reviewId, f, body);
         return ok ? null : id;
       }),

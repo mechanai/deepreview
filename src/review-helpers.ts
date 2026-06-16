@@ -97,9 +97,9 @@ export function buildReviewBody(
     }
     if (validOid && validRepo) {
       const permalink = `https://github.com/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/blob/${headOid}/${f.path.split("/").map(encodeURIComponent).join("/")}#L${f.line}`;
-      body += `<details>\n<summary><a href="${permalink}"><code>${escapeHtml(f.path)}:${f.line}</code></a></summary>\n\n${f.body}\n</details>\n\n`;
+      body += `<details>\n<summary><a href="${permalink}"><code>${escapeHtml(f.path)}:${f.line}</code></a></summary>\n\n${f.renderedBody ?? f.body}\n</details>\n\n`;
     } else {
-      body += `<details>\n<summary><code>${escapeHtml(f.path)}:${f.line}</code></summary>\n\n${f.body}\n</details>\n\n`;
+      body += `<details>\n<summary><code>${escapeHtml(f.path)}:${f.line}</code></summary>\n\n${f.renderedBody ?? f.body}\n</details>\n\n`;
     }
   }
   body += AI_TRAILER;
@@ -132,13 +132,11 @@ export function classifyAndLog(
   for (const w of suggestionWarnings) {
     console.warn(w);
   }
-  // Strip malformed suggestion blocks so they don't produce broken "Apply suggestion" buttons
+  // Strip all suggestion blocks from findings where the largest block exceeds the anchor range
+  const oversized = findingsExceedingAnchor(classified);
   for (const f of tier1) {
-    const suggLines = maxSuggestionLines(f.body);
-    if (suggLines === 0) continue;
-    const anchorLines = f.startLine === undefined ? 1 : f.line - f.startLine + 1;
-    if (suggLines > anchorLines) {
-      f.body = stripSuggestionBlocks(f.body);
+    if (oversized.has(f)) {
+      f.renderedBody = stripSuggestionBlocks(f.body);
     }
   }
   return { tier1, tier2, tier3 };
@@ -176,16 +174,43 @@ function stripSuggestionBlocks(body: string): string {
   const lines = body.split("\n");
   const result: string[] = [];
   let inSuggestion = false;
+  let pendingBlock: string[] = [];
   for (const line of lines) {
     if (!inSuggestion && SUGGESTION_OPEN_RE.test(line.trim())) {
       inSuggestion = true;
+      pendingBlock = [line];
     } else if (inSuggestion && line.trim() === "```") {
       inSuggestion = false;
-    } else if (!inSuggestion) {
+      pendingBlock = [];
+    } else if (inSuggestion) {
+      pendingBlock.push(line);
+    } else {
       result.push(line);
     }
   }
+  if (inSuggestion) {
+    // Unclosed block — preserve all lines as-is
+    result.push(...pendingBlock);
+  }
   return result.join("\n");
+}
+
+/**
+ * Identify tier-1 findings whose largest suggestion block exceeds the anchor range.
+ * Returns a Set of findings that need their suggestion blocks stripped.
+ */
+function findingsExceedingAnchor(findings: ClassifiedFinding[]): Set<ClassifiedFinding> {
+  const exceeded = new Set<ClassifiedFinding>();
+  for (const f of findings) {
+    if (f.tier !== 1) continue;
+    const suggLines = maxSuggestionLines(f.body);
+    if (suggLines === 0) continue;
+    const anchorLines = f.startLine === undefined ? 1 : Math.max(1, f.line - f.startLine + 1);
+    if (suggLines > anchorLines) {
+      exceeded.add(f);
+    }
+  }
+  return exceeded;
 }
 
 /**
@@ -198,18 +223,15 @@ function stripSuggestionBlocks(body: string): string {
  */
 export function validateSuggestionAnchors(findings: ClassifiedFinding[]): string[] {
   const warnings: string[] = [];
-  for (const f of findings) {
-    if (f.tier !== 1) continue;
+  const oversized = findingsExceedingAnchor(findings);
+  for (const f of oversized) {
     const suggLines = maxSuggestionLines(f.body);
-    if (suggLines === 0) continue;
-    const anchorLines = f.startLine === undefined ? 1 : f.line - f.startLine + 1;
-    if (suggLines > anchorLines) {
-      const anchor =
-        f.startLine === undefined ? `${f.path}:${f.line}` : `${f.path}:${f.startLine}-${f.line}`;
-      warnings.push(
-        `WARN: ${anchor} has ${anchorLines}-line anchor but ${suggLines}-line suggestion — anchor should be widened to cover all lines being replaced`,
-      );
-    }
+    const anchorLines = f.startLine === undefined ? 1 : Math.max(1, f.line - f.startLine + 1);
+    const anchor =
+      f.startLine === undefined ? `${f.path}:${f.line}` : `${f.path}:${f.startLine}-${f.line}`;
+    warnings.push(
+      `WARN: ${anchor} has ${anchorLines}-line anchor but ${suggLines}-line suggestion — anchor should be widened to cover all lines being replaced`,
+    );
   }
   return warnings;
 }

@@ -1,6 +1,6 @@
 import { describe, it } from "bun:test";
 import assert from "node:assert/strict";
-import { validateSuggestionAnchors } from "./review-helpers.ts";
+import { validateSuggestionAnchors, classifyAndLog } from "./review-helpers.ts";
 
 describe("validateSuggestionAnchors — no warnings", () => {
   it("returns no warnings for findings without suggestion blocks", () => {
@@ -102,5 +102,69 @@ describe("validateSuggestionAnchors — warnings", () => {
     // Should warn — the largest suggestion (3 lines) exceeds the 1-line anchor
     assert.equal(warnings.length, 1);
     assert.ok(warnings[0].includes("3-line suggestion"));
+  });
+});
+
+// Minimal diff that puts foo.go line 10 in a hunk (tier 1)
+const DIFF_FOO = `diff --git a/foo.go b/foo.go
+--- a/foo.go
++++ b/foo.go
+@@ -1,15 +1,15 @@
+ line1
+ line2
+ line3
+ line4
+ line5
+ line6
+ line7
+ line8
+ line9
+-old
++new
+ line11
+ line12
+ line13
+ line14
+ line15
+`;
+
+describe("classifyAndLog — suggestion stripping", () => {
+  it("sets renderedBody when suggestion exceeds anchor", () => {
+    const body = ["Replace this:", "```suggestion", "line A", "line B", "line C", "```"].join("\n");
+    // Single-line anchor (no startLine), 3-line suggestion — exceeds
+    const findings = [{ path: "foo.go", line: 10, body }];
+    const { tier1 } = classifyAndLog(findings, DIFF_FOO);
+    assert.equal(tier1.length, 1);
+    assert.notEqual(tier1[0].renderedBody, undefined);
+    assert.ok(!tier1[0].renderedBody!.includes("```suggestion"));
+    // Original body is untouched
+    assert.ok(tier1[0].body.includes("```suggestion"));
+  });
+
+  it("preserves content from unclosed suggestion blocks", () => {
+    const body = [
+      "Some prose",
+      "```suggestion",
+      "line A",
+      "line B",
+      // No closing fence
+    ].join("\n");
+    const findings = [{ path: "foo.go", line: 10, body }];
+    const { tier1 } = classifyAndLog(findings, DIFF_FOO);
+    assert.equal(tier1.length, 1);
+    // renderedBody should contain the unclosed block content
+    const rendered = tier1[0].renderedBody ?? tier1[0].body;
+    assert.ok(rendered.includes("line A"));
+    assert.ok(rendered.includes("line B"));
+  });
+
+  it("handles inverted startLine/line without negative anchorLines", () => {
+    const body = ["Fix:", "```suggestion", "x", "```"].join("\n");
+    // startLine > line (inverted) — anchorLines should clamp to 1
+    const findings = [{ path: "foo.go", startLine: 12, line: 10, body }];
+    const { tier1 } = classifyAndLog(findings, DIFF_FOO);
+    assert.equal(tier1.length, 1);
+    // 1-line suggestion vs clamped 1-line anchor — fits, no stripping
+    assert.equal(tier1[0].renderedBody, undefined);
   });
 });
