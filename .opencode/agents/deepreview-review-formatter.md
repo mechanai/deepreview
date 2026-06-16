@@ -77,6 +77,38 @@ line: <line number>
 - If the synthesis says "line 42" but looking at the diff that corresponds to a different new-side line, use the correct new-side line
 - If you cannot determine an exact line, use the first line of the relevant function/block
 
+## Suggestion block rules
+
+When a finding contains a ` ```suggestion ` block, the `startLine..line` anchor MUST cover every line that the suggestion replaces — not just the line referenced in the synthesis.
+
+Before writing a suggestion:
+
+1. Identify the exact lines in the diff that will be replaced by the suggestion content
+2. Count those lines — this is your replacement scope
+3. Set `startLine` to the first line being replaced and `line` to the last
+4. The anchor range (startLine..line) MUST cover all original lines being removed or modified. The suggestion may be shorter than the anchor range (deletions are fine), but should not be longer — if your replacement has more lines than the anchor covers, widen the anchor to include all affected lines.
+
+Example — replacing a 5-line callout block (lines 246-250). Note: use exactly three backticks for suggestion blocks in output — the four-backtick fence below is only for illustration:
+
+````
+---
+path: docs/migration.md
+startLine: 246
+line: 250
+---
+```suggestion
+> [!WARNING]
+> The actual default is 1 MB, not 10 MB.
+```
+````
+
+Common mistakes to avoid:
+
+- Anchoring to a single line inside a multi-line block (e.g., `line: 247` when replacing lines 246-250) — this duplicates surrounding lines when applied
+- Including lines in the suggestion body that already exist outside the anchor range — this creates duplicates
+- If you cannot determine the exact replacement scope from the diff, use prose instead of a suggestion block
+- As a safety net, the posting pipeline strips suggestion blocks that exceed the anchor range — if your suggestion disappears, widen the anchor
+
 ## Response contract
 
 After writing the threads file, your ONLY response must be the absolute path to your output file and a count line (e.g., "12 threads written"). Do not summarize findings.
