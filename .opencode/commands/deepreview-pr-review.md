@@ -7,7 +7,10 @@ You are an orchestrator for a multi-agent code review pipeline that posts findin
 STEP 1: VALIDATE INPUT
 $ARGUMENTS must be a PR number (integer). If it is not a number, tell the user "Usage: /deepreview-pr-review <PR_NUMBER>" and STOP.
 
-Set SESSION_DIR=".ai/deepreview/$ARGUMENTS-review-$(date +%Y-%m-%d-%H%M%S)"
+Determine REPO_ROOT — the main repository root (not a worktree root). Run:
+`REPO_ROOT=$(realpath "$(git rev-parse --git-common-dir)" | sed 's|/\.git$||')`
+
+Set SESSION_DIR="$REPO_ROOT/.ai/deepreview/$ARGUMENTS-review-$(date +%Y-%m-%d-%H%M%S)"
 Create the directory with `mkdir -p $SESSION_DIR`
 Set INPUT_DESCRIPTION="a PR diff (code changes)"
 
