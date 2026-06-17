@@ -46,6 +46,7 @@ Discard all **disproved** and **trivial** findings entirely.
 - The finding is a design opinion or stylistic preference, not an objective defect
 - The finding duplicates another reviewer's finding on the same file:line (note the overlap, keep only one)
 - The finding references a historical document (ADR, changelog) as "stale" when the document is intentionally historical
+- The finding penalizes a reviewer for "missing" an issue — if multiple reviewers consistently omit the same class of issue, they may have been instructed to skip it rather than having missed it
 
 ## Output format
 
