@@ -31,8 +31,12 @@ Run the full deepreview pipeline (Stages 1-5 from the deepreview command):
 - Append SESSION_DIR to ALL_SESSION_DIRS
 - Stage 1: 5 parallel reviewers — prepend PRIOR_CONTEXT (if non-empty) to each reviewer's prompt as "${PRIOR_CONTEXT}You are reviewing ... Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-{perspective}.md."
 - Stage 2: 5 parallel validators (cross-validation)
-  - Note: validators do NOT receive PRIOR_CONTEXT. This is intentional — validators independently verify reviewer claims without being influenced by design context.- Stage 3: Synthesizer
+  - Note: validators do NOT receive PRIOR_CONTEXT. This is intentional — validators independently verify reviewer claims without being influenced by design context.
+- Stage 3: Synthesizer
 - Stage 4: Implementation planner
+- Stage 5: Plan validator — dispatch plan-validator with implementation-plan.md, synthesis.md, and input.txt.
+  If it fails, warn and set PLAN_FILE="$SESSION_DIR/implementation-plan.md".
+  Otherwise set PLAN_FILE="$SESSION_DIR/validated-plan.md".
 
 Record the stats from the synthesis return: count of critical, warning, and suggestion findings.
 
@@ -45,7 +49,7 @@ If the synthesis/review has 0 critical AND 0 warning AND 0 suggestion findings:
 STEP 4: APPLY ALL FIXES
 Dispatch the applier automatically — do NOT ask the user for permission.
 Use the Task tool with subagent_type="deepreview-applier":
-"Read the implementation plan at $SESSION_DIR/implementation-plan.md. Apply the fixes."
+"Read the implementation plan at $PLAN_FILE. Apply the fixes."
 
 Wait for the applier to return. Parse the applier's response for VERIFICATION status.
 
@@ -54,7 +58,14 @@ If the applier reports VERIFICATION: FAIL:
 
 - Show the user the error summary from the applier's response
 - Ask: "Applied fixes failed verification (lint/test). Options: revert and skip failing fix, continue anyway, or stop?"
-- If revert: run `git checkout -- .` to undo all changes from this iteration, note which fix failed, add it to a SKIP_LIST, and re-run the planner+applier without that fix.
+- If revert:
+  1. Run `git checkout -- .` to undo all changes from this iteration.
+  2. Note which fix failed, add it to a SKIP_LIST, and re-run the planner without that fix.
+  3. Dispatch plan-validator — Use the Task tool with subagent_type="deepreview-plan-validator":
+     "Read the implementation plan at $SESSION_DIR/implementation-plan.md, the synthesis at $SESSION_DIR/synthesis.md, and the original input at $SESSION_DIR/input.txt. Write the validated plan to $SESSION_DIR/validated-plan.md."
+     If it fails, set PLAN_FILE="$SESSION_DIR/implementation-plan.md".
+     Otherwise set PLAN_FILE="$SESSION_DIR/validated-plan.md".
+  4. Pass PLAN_FILE to the applier.
 - If continue: proceed to STEP 5 (the next iteration's reviewers will likely catch the introduced error).
 - If stop: STOP.
 
@@ -191,6 +202,12 @@ Task 12 — Use the Task tool with subagent_type="deepreview-planner":
 "Read the synthesis at $SESSION_DIR/synthesis.md. Write the implementation plan to $SESSION_DIR/implementation-plan.md."
 
 Record the summary line.
+
+Stage 5 — DISPATCH PLAN VALIDATOR:
+Task 13 — Use the Task tool with subagent_type="deepreview-plan-validator":
+"Read the implementation plan at $SESSION_DIR/implementation-plan.md, the synthesis at $SESSION_DIR/synthesis.md, and the original input at $SESSION_DIR/input.txt. Write the validated plan to $SESSION_DIR/validated-plan.md."
+
+If this task fails, emit a warning: "Plan validation failed — applying unvalidated plan." and set PLAN_FILE="$SESSION_DIR/implementation-plan.md". Otherwise set PLAN_FILE="$SESSION_DIR/validated-plan.md" and record the stats line.
 
 Go to STEP 3.
 
