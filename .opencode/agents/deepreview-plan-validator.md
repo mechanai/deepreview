@@ -16,6 +16,7 @@ You are a skeptical senior engineer. Your job is to independently verify each pr
 ## Input
 
 You will receive paths to:
+
 1. An implementation plan file (the planner's output)
 2. An input file (the original diff or file content being reviewed)
 3. A synthesis file (the review findings the fixes address)
