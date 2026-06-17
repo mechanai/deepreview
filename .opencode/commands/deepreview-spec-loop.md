@@ -26,6 +26,9 @@ Run the full deepreview-spec pipeline (Stages 1-5 from the deepreview-spec comma
 - Stage 2: 5 parallel validators (cross-validation)
 - Stage 3: Synthesizer
 - Stage 4: Implementation planner (spec changes, not code changes)
+- Stage 5: Plan validator — dispatch plan-validator with implementation-plan.md, synthesis.md, and input.txt.
+  If it fails, warn and set PLAN_FILE="$SESSION_DIR/implementation-plan.md".
+  Otherwise set PLAN_FILE="$SESSION_DIR/validated-plan.md".
 
 Record the stats from the synthesis return: count of critical, warning, and suggestion findings.
 
@@ -46,7 +49,7 @@ B) PLATEAU EXIT: If ITERATION >= 3 and the total has not decreased compared to t
 STEP 4: APPLY ALL FIXES
 Dispatch the applier automatically — do NOT ask the user for permission.
 Use the Task tool with subagent_type="deepreview-applier":
-"Read the implementation plan at $SESSION_DIR/implementation-plan.md. Apply the fixes."
+"Read the implementation plan at $PLAN_FILE. Apply the fixes."
 
 Wait for the applier to return.
 
@@ -147,6 +150,12 @@ Task 12 — Use the Task tool with subagent_type="deepreview-planner":
 "Read the synthesis at $SESSION_DIR/synthesis.md. The original input is a spec/plan document, not code. Write an implementation plan that describes what changes to make to the spec/plan document itself (not code changes). Write to $SESSION_DIR/implementation-plan.md."
 
 Record the summary line.
+
+Stage 5 — DISPATCH PLAN VALIDATOR:
+Task 13 — Use the Task tool with subagent_type="deepreview-plan-validator":
+"Read the implementation plan at $SESSION_DIR/implementation-plan.md, the synthesis at $SESSION_DIR/synthesis.md, and the original input at $SESSION_DIR/input.txt. Write the validated plan to $SESSION_DIR/validated-plan.md."
+
+If this task fails, emit a warning: "Plan validation failed — applying unvalidated plan." and set PLAN_FILE="$SESSION_DIR/implementation-plan.md". Otherwise set PLAN_FILE="$SESSION_DIR/validated-plan.md" and record the stats line.
 
 Go to STEP 3.
 
