@@ -41,6 +41,16 @@ Run the full deepreview pipeline (Stages 1-5 from the deepreview command):
 Record the stats from the synthesis return: count of critical, warning, and suggestion findings.
 
 STEP 3: CHECK EXIT CONDITION
+DEADLOCK CHECK (iter 2+ only):
+Compare this iteration's findings (file:line + issue title) against the previous iteration's findings. If two consecutive iterations produce the SAME findings, this indicates a deadlock — the applier is making changes that don't resolve the issue, or the reviewer keeps flagging the same thing.
+
+When deadlock is detected:
+
+- Tell the user: "Deadlock detected: the following findings persist across iterations:"
+- List the repeated findings.
+- Ask: "How would you like to resolve these? Options: skip these findings, provide guidance, or stop the loop."
+- Follow the user's instruction.
+
 If the synthesis/review has 0 critical AND 0 warning AND 0 suggestion findings:
 
 - Tell the user: "deepreviewloop complete after $ITERATION iteration(s). No findings remain."
@@ -60,10 +70,10 @@ If the applier reports VERIFICATION: FAIL:
 - Ask: "Applied fixes failed verification (lint/test). Options: revert and skip failing fix, continue anyway, or stop?"
 - If revert:
   1. Run `git checkout -- .` to undo all changes from this iteration.
-  2. Note which fix failed, add it to a SKIP_LIST, and re-run the planner without that fix.
+  2. Note which fix failed, add it to a SKIP_LIST, and re-run the planner without that fix, writing to `$SESSION_DIR/implementation-plan-retry.md`.
   3. Dispatch plan-validator — Use the Task tool with subagent_type="deepreview-plan-validator":
-     "Read the implementation plan at $SESSION_DIR/implementation-plan.md, the synthesis at $SESSION_DIR/synthesis.md, and the original input at $SESSION_DIR/input.txt. Write the validated plan to $SESSION_DIR/validated-plan.md."
-     If it fails, set PLAN_FILE="$SESSION_DIR/implementation-plan.md".
+     "Read the implementation plan at $SESSION_DIR/implementation-plan-retry.md, the synthesis at $SESSION_DIR/synthesis.md, and the original input at $SESSION_DIR/input.txt. Write the validated plan to $SESSION_DIR/validated-plan.md. Note: the following findings were intentionally excluded due to verification failures: [SKIP_LIST]"
+      If it fails, set PLAN_FILE="$SESSION_DIR/implementation-plan-retry.md".
      Otherwise set PLAN_FILE="$SESSION_DIR/validated-plan.md".
   4. Pass PLAN_FILE to the applier.
 - If continue: proceed to STEP 5 (the next iteration's reviewers will likely catch the introduced error).
@@ -210,16 +220,6 @@ Task 13 — Use the Task tool with subagent_type="deepreview-plan-validator":
 If this task fails, emit a warning: "Plan validation failed — applying unvalidated plan." and set PLAN_FILE="$SESSION_DIR/implementation-plan.md". Otherwise set PLAN_FILE="$SESSION_DIR/validated-plan.md" and record the stats line.
 
 Go to STEP 3.
-
-STEP 6: DECISION DEADLOCK DETECTION
-If two consecutive iterations produce the SAME findings (same file:line, same issue title), this indicates a deadlock — the applier is making changes that don't resolve the issue, or the reviewer keeps flagging the same thing.
-
-When deadlock is detected:
-
-- Tell the user: "Deadlock detected: the following findings persist across iterations:"
-- List the repeated findings.
-- Ask: "How would you like to resolve these? Options: skip these findings, provide guidance, or stop the loop."
-- Follow the user's instruction.
 
 IMPORTANT RULES:
 

@@ -1,13 +1,15 @@
 ---
-description: "Validates proposed fixes from the implementation plan against actual source code before application. Part of the deepreview pipeline."
+description: "Validates proposed fixes from the implementation plan against actual source code or spec documents before application. Part of the deepreview pipeline."
 mode: subagent
 temperature: 0.1
 permission:
-  edit: allow
+  # Read access is implicitly unrestricted (OpenCode default) — needed to inspect source files.
+  edit:
+    ".ai/deepreview/**": allow
+    "*": deny
   bash:
     "git log*": allow
     "git blame*": allow
-    "git show*": allow
     "*": deny
 ---
 
@@ -28,6 +30,7 @@ Read all three.
 For each fix in the implementation plan, in order:
 
 1. **Read broader context** — Read the full function/class containing the fix target (up to ~200 lines per fix). If the fix changes a function signature or behavior, also read direct callers. Use the Read tool with offset/limit. Do NOT read entire files.
+   - _If the input is spec/plan documents (not source code):_ skip caller/callee checks. Instead, validate logical consistency, cross-reference accuracy, and that the fix matches the synthesis finding.
 2. **Verify correctness** — Does the proposed code change actually fix the identified issue? Check for:
    - Logic errors in the fix itself
    - Missing imports or dependencies
@@ -35,12 +38,12 @@ For each fix in the implementation plan, in order:
    - Broken callers/callees from signature changes
    - Whether the fix matches what the synthesis finding actually describes
 3. **Check scope** — Does the fix stay within what the finding requires? Flag if it adds unnecessary validation, refactoring, or unrelated changes.
-4. **Detect conflicts** (best-effort) — Do any fixes modify the same file region or interact in ways that would break when applied together? When a conflict is detected, reject the lower-priority fix.
+4. **Detect conflicts** (best-effort) — Do any fixes modify the same file region or interact in ways that would break when applied together? When a conflict is detected, reject the lower-priority fix. When conflicting fixes have equal priority, reject the one that appears later in the plan.
 
 ## Verdict per fix
 
 - **approved** — Fix is correct and safe to apply as-is.
-- **revised** — Fix addresses the right issue but needs adjustment. You provide a corrected code change. Note: revised code is not itself validated and carries the same risk as planner originals.
+- **revised** — Fix addresses the right issue but needs adjustment. You provide a corrected code change. Note: revised code reflects the validator's correction but has not been re-validated by a second pass.
 - **rejected** — Fix is wrong, introduces a new bug, or is out of scope. Explain why. The applier will skip this fix.
 
 ## Output format

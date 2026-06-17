@@ -53,6 +53,8 @@ Use the Task tool with subagent_type="deepreview-applier":
 
 Wait for the applier to return.
 
+<!-- Note: No verification failure handling here (unlike code-loop) because spec changes don't trigger lint/test failures. -->
+
 STEP 5: INCREMENT AND RE-REVIEW
 Set ITERATION = ITERATION + 1
 
@@ -74,17 +76,21 @@ Check if input.txt is empty. If empty, tell user "Nothing to review — files ar
 BUILD PRIOR CONTEXT FOR THIS ITERATION:
 Dispatch a helper task to extract findings from ALL previous syntheses:
 Task — Use the Task tool with subagent_type="general":
-"Read the synthesis files from ALL completed iterations ([LIST EACH PATH FROM ALL_SESSION_DIRS EXCLUDING CURRENT]). If any synthesis file does not exist, skip it. Extract ALL findings across them as a deduplicated Markdown list in this exact format:
+"Read the synthesis files AND implementation plan files from these directories: [LIST EACH PATH FROM ALL_SESSION_DIRS EXCLUDING CURRENT]. If any file does not exist, skip it. Extract:
 
 ## Prior Findings (already reported — do not re-report or verify)
 
 - [Short Issue Title] ([category]) — [file:line or section reference]
 
+## Applied Fixes (changes made by previous iterations — new bugs here are regressions)
+
+- [Fix title from implementation plan] — [file:line or section reference] (applied in iter N)
+
 ## Covered Regions (already examined — prioritize elsewhere)
 
 - [file or section references, padded generously around each finding location]
 
-Deduplicate findings that appear in multiple syntheses. Return ONLY these two sections, nothing else."
+Deduplicate findings that appear in multiple syntheses. Return ONLY these three sections, nothing else."
 
 Set PRIOR_CONTEXT to the returned text. Validate that it contains "## Prior Findings" — if not, warn the user ("Helper returned malformed prior context — proceeding without deduplication") and set PRIOR_CONTEXT="". If CONTEXT_FILE exists, prepend:
 "## Design Decisions (intentional — do not flag)\nThe following are deliberate design choices. Do NOT flag these as issues or suggest alternatives.\n`\n" + contents of CONTEXT_FILE + "\n`\n\n"
