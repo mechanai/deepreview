@@ -89,7 +89,7 @@ OpenCode caches plugins on first install and does not automatically check for ne
 To upgrade:
 
 ```bash
-rm -rf ~/.cache/opencode/packages/*deepreview*/
+rm -rf ~/.cache/opencode/packages/@mechanai/deepreview*/
 ```
 
 Then restart OpenCode. It will re-fetch the latest version.
