@@ -26,6 +26,9 @@ Run the full deepreview-spec pipeline (Stages 1-5 from the deepreview-spec comma
 - Stage 2: 5 parallel validators (cross-validation)
 - Stage 3: Synthesizer
 - Stage 4: Implementation planner (spec changes, not code changes)
+- Stage 5: Plan validator — dispatch plan-validator with implementation-plan.md, synthesis.md, and input.txt.
+  If it fails, warn and set PLAN_FILE="$SESSION_DIR/implementation-plan.md".
+  Otherwise set PLAN_FILE="$SESSION_DIR/validated-plan.md".
 
 Record the stats from the synthesis return: count of critical, warning, and suggestion findings.
 
@@ -46,9 +49,11 @@ B) PLATEAU EXIT: If ITERATION >= 3 and the total has not decreased compared to t
 STEP 4: APPLY ALL FIXES
 Dispatch the applier automatically — do NOT ask the user for permission.
 Use the Task tool with subagent_type="deepreview-applier":
-"Read the implementation plan at $SESSION_DIR/implementation-plan.md. Apply the fixes."
+"Read the implementation plan at $PLAN_FILE. Apply the fixes."
 
 Wait for the applier to return.
+
+<!-- Note: No verification failure handling here (unlike code-loop) because spec changes don't trigger lint/test failures. -->
 
 STEP 5: INCREMENT AND RE-REVIEW
 Set ITERATION = ITERATION + 1
@@ -71,17 +76,21 @@ Check if input.txt is empty. If empty, tell user "Nothing to review — files ar
 BUILD PRIOR CONTEXT FOR THIS ITERATION:
 Dispatch a helper task to extract findings from ALL previous syntheses:
 Task — Use the Task tool with subagent_type="general":
-"Read the synthesis files from ALL completed iterations ([LIST EACH PATH FROM ALL_SESSION_DIRS EXCLUDING CURRENT]). If any synthesis file does not exist, skip it. Extract ALL findings across them as a deduplicated Markdown list in this exact format:
+"Read the synthesis files AND implementation plan files from these directories: [LIST EACH PATH FROM ALL_SESSION_DIRS EXCLUDING CURRENT]. If any file does not exist, skip it. Extract:
 
 ## Prior Findings (already reported — do not re-report or verify)
 
 - [Short Issue Title] ([category]) — [file:line or section reference]
 
+## Applied Fixes (changes made by previous iterations — new bugs here are regressions)
+
+- [Fix title from implementation plan] — [file:line or section reference] (applied in iter N)
+
 ## Covered Regions (already examined — prioritize elsewhere)
 
 - [file or section references, padded generously around each finding location]
 
-Deduplicate findings that appear in multiple syntheses. Return ONLY these two sections, nothing else."
+Deduplicate findings that appear in multiple syntheses. Return ONLY these three sections, nothing else."
 
 Set PRIOR_CONTEXT to the returned text. Validate that it contains "## Prior Findings" — if not, warn the user ("Helper returned malformed prior context — proceeding without deduplication") and set PRIOR_CONTEXT="". If CONTEXT_FILE exists, prepend:
 "## Design Decisions (intentional — do not flag)\nThe following are deliberate design choices. Do NOT flag these as issues or suggest alternatives.\n`\n" + contents of CONTEXT_FILE + "\n`\n\n"
@@ -147,6 +156,12 @@ Task 12 — Use the Task tool with subagent_type="deepreview-planner":
 "Read the synthesis at $SESSION_DIR/synthesis.md. The original input is a spec/plan document, not code. Write an implementation plan that describes what changes to make to the spec/plan document itself (not code changes). Write to $SESSION_DIR/implementation-plan.md."
 
 Record the summary line.
+
+Stage 5 — DISPATCH PLAN VALIDATOR:
+Task 13 — Use the Task tool with subagent_type="deepreview-plan-validator":
+"Read the implementation plan at $SESSION_DIR/implementation-plan.md, the synthesis at $SESSION_DIR/synthesis.md, and the original input at $SESSION_DIR/input.txt. Write the validated plan to $SESSION_DIR/validated-plan.md."
+
+If this task fails, emit a warning: "Plan validation failed — applying unvalidated plan." and set PLAN_FILE="$SESSION_DIR/implementation-plan.md". Otherwise set PLAN_FILE="$SESSION_DIR/validated-plan.md" and record the stats line.
 
 Go to STEP 3.
 

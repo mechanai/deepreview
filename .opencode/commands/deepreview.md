@@ -98,18 +98,25 @@ Task 12 — Use the Task tool with subagent_type="deepreview-planner":
 
 Record the summary line from its return.
 
-STEP 7: PRESENT RESULTS
+STEP 7: DISPATCH STAGE 5 — PLAN VALIDATION (1 task)
+Task 13 — Use the Task tool with subagent_type="deepreview-plan-validator":
+"Read the implementation plan at $SESSION_DIR/implementation-plan.md, the synthesis at $SESSION_DIR/synthesis.md, and the original input at $SESSION_DIR/input.txt. Write the validated plan to $SESSION_DIR/validated-plan.md."
+
+If this task fails (agent error, timeout, or does not produce validated-plan.md), emit a warning: "Plan validation failed — applying unvalidated plan." and set PLAN_FILE="$SESSION_DIR/implementation-plan.md". Otherwise set PLAN_FILE="$SESSION_DIR/validated-plan.md" and record the stats line.
+
+STEP 8: PRESENT RESULTS
 Show the user:
 
 - Session directory: $SESSION_DIR/
 - Which reviewers completed (and any that failed)
 - Stats from synthesis (the stats line from Step 5)
 - Summary from planner (the summary line from Step 6)
+- Plan validation stats (if available, from Step 7)
 - Ask: "Do you want me to apply the fixes?"
 
-STEP 8: IF USER SAYS YES — DISPATCH STAGE 5 (1 task)
-Task 13 — Use the Task tool with subagent_type="deepreview-applier":
-"Read the implementation plan at $SESSION_DIR/implementation-plan.md. Apply the fixes."
+STEP 9: IF USER SAYS YES — DISPATCH STAGE 6 (1 task)
+Task 14 — Use the Task tool with subagent_type="deepreview-applier":
+"Read the implementation plan at $PLAN_FILE. Apply the fixes."
 
 Show the user the list of files changed from the applier's return.
 

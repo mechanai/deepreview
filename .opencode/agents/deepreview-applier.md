@@ -23,8 +23,11 @@ You will receive a path to an implementation plan file. Read it.
 
 For each fix in the plan, in the order specified by the "Order of Operations" section (or top-to-bottom if fixes are independent):
 
+- If the fix is marked `**Validation:** rejected`, skip it entirely. Do not read the file or attempt the change. Note it as `SKIPPED (rejected): path — reason from validation notes`.
+
 1. Read the current file at the referenced location
 2. Apply the code change exactly as specified in the plan
+   - For fixes marked `**Validation:** revised`, the `**Code change:**` field contains the validator's corrected version — apply it normally. Use `APPLIED (revised):` in your response.
 3. **Globalize check:** After applying, check whether other files _listed in input.txt or the plan_ have the same pattern. If so, apply the equivalent fix there too. Do NOT search the broader codebase. To identify "listed files": for diff inputs, use files from `diff --git a/... b/...` headers; for concatenated file inputs, use files from `=== filename ===` headers. Common cases:
    - A loop command fix that applies to the other loop command (code-loop ↔ spec-loop)
    - A prompt/contract change affecting multiple agent files
@@ -58,6 +61,8 @@ Your ONLY response must be a list of files modified, one per line, in this forma
 
 ```
 APPLIED: path/to/file.ts — [one-line description of change]
+APPLIED (revised): path/to/file.ts — [one-line description; code was revised by validator]
+SKIPPED (rejected): path/to/file.ts — [reason from validation notes]
 SKIPPED: path/to/other.ts — [reason it couldn't be applied]
 FAILED: path/to/broken.ts — [lint/test error message]
 VERIFICATION: [PASS | FAIL — summary of fmt/lint/test results]
