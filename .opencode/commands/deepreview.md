@@ -41,10 +41,37 @@ Set INPUT_DESCRIPTION based on mode:
 - MODE=branch: "a branch diff against main"
 - MODE=files: "the following files: <list of filenames>"
 
-If CONTEXT_FILE exists, set DESIGN_CONTEXT to the contents of that file. Build a CONTEXT_PREAMBLE:
-"## Design Decisions (intentional — do not flag)\nThe following are deliberate design choices. Do NOT flag these as issues or suggest alternatives.\n`\n$DESIGN_CONTEXT\n`\n\n"
+STEP 2a: EXTRACT PROJECT CONTEXT
+Build PROJECT_CONTEXT by extracting metadata (version, deployment model, publish status) from the repo:
 
-If CONTEXT_FILE does not exist, set CONTEXT_PREAMBLE="" (empty string).
+- Check for package.json or Cargo.toml to detect version and publish status
+- Check for .deepreview.yml to detect explicit deployment model (threat-model field)
+- If no .deepreview.yml exists, infer deployment model: v0.x.0 and private packages are "internal-network", v1+.x.x and public are "public-facing", otherwise "unknown"
+- Format as:
+
+```
+## Project Context (for severity calibration)
+
+**Name:** [project name]
+**Version:** [version] (if v0.x.0, include note: "pre-1.0 — relaxed API stability expectations")
+**Deployment:** [localhost-only|internal-network|public-facing|library] [threat model note]
+**Status:** [Private/internal|Published]
+
+Use this context to calibrate finding severity. For example:
+- v0.1.0 projects may have API instability — flag as **suggestion**, not **warning**.
+- Localhost-only tools have no network threat model — downgrade auth/network findings to **suggestion**.
+- Stale docs in pre-1.0 projects are **suggestion**-level, not critical.
+```
+
+If metadata extraction fails or no version info is found, set PROJECT_CONTEXT="" (empty string).
+
+STEP 2b: BUILD CONTEXT PREAMBLE
+If CONTEXT_FILE exists, set DESIGN_CONTEXT to the contents of that file. Build a CONTEXT_PREAMBLE:
+"${PROJECT_CONTEXT}## Design Decisions (intentional — do not flag)\nThe following are deliberate design choices. Do NOT flag these as issues or suggest alternatives.\n`\n$DESIGN_CONTEXT\n`\n\n"
+
+If CONTEXT_FILE does not exist and PROJECT_CONTEXT is not empty, set CONTEXT_PREAMBLE to just "${PROJECT_CONTEXT}\n"
+
+If both are empty, set CONTEXT_PREAMBLE="" (empty string).
 
 STEP 3: DISPATCH STAGE 1 — INITIAL REVIEW (5 parallel tasks)
 Dispatch ALL FIVE of these Task tool calls simultaneously in a single message:

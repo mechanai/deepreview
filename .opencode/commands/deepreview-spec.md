@@ -23,10 +23,21 @@ STEP 2: PREPARE INPUT
 
 Set INPUT_DESCRIPTION="the following spec/plan files: $ARGUMENTS"
 
-If CONTEXT_FILE exists, set DESIGN_CONTEXT to the contents of that file. Build a CONTEXT_PREAMBLE:
+Extract PROJECT_CONTEXT by detecting project metadata (version, deployment model, publish status):
+
+- Check for package.json or Cargo.toml to detect version and publish status
+- Check for .deepreview.yml to detect explicit deployment model (threatModel field)
+- If no .deepreview.yml exists, infer deployment model: v0.x.0 and private packages are "internal-network", v1+.x.x and public are "public-facing", otherwise "unknown"
+- Format as a calibration preamble with version info, deployment model, and guidance for severity adjustment
+- If metadata extraction fails or no version info is found, set PROJECT_CONTEXT="" (empty string)
+
+Build CONTEXT_PREAMBLE:
+If PROJECT_CONTEXT is not empty, start with: "${PROJECT_CONTEXT}\n"
+
+If CONTEXT_FILE exists, append:
 "## Design Decisions (intentional — do not flag)\nThe following are deliberate design choices. Do NOT flag these as issues or suggest alternatives.\n`\n$DESIGN_CONTEXT\n`\n\n"
 
-If CONTEXT_FILE does not exist, set CONTEXT_PREAMBLE="" (empty string).
+If both PROJECT_CONTEXT and CONTEXT_FILE are empty, set CONTEXT_PREAMBLE="" (empty string).
 
 STEP 3: DISPATCH STAGE 1 — INITIAL REVIEW (5 parallel tasks)
 Dispatch ALL FIVE of these Task tool calls simultaneously in a single message:
