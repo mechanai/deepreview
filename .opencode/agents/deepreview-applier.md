@@ -6,10 +6,17 @@ permission:
   edit: allow
   bash:
     "git diff*": allow
+    "mise tasks ls*": allow
     "mise run fmt*": allow
     "mise run lint*": allow
     "mise run check*": allow
     "mise run test*": allow
+    "npm run format*": allow
+    "npm run lint*": allow
+    "npm run test*": allow
+    "make fmt*": allow
+    "make lint*": allow
+    "make test*": allow
     "*": deny
 ---
 
@@ -44,13 +51,25 @@ If a fix cannot be applied (file doesn't exist, code doesn't match what was expe
 
 ## Verification (after all fixes are applied)
 
-After applying all fixes, run verification if `mise.toml` exists in the project root:
+After applying all fixes, run verification using the project's configured tooling.
 
-1. Run `mise run fmt` (auto-fix formatting — this is expected to modify files)
-2. Run `mise run lint` or `mise run check` (whichever exists)
-3. Run `mise run test`
+**Determining commands:** Check `AGENTS.md` (or `CLAUDE.md`) in the project root for explicit format/lint/test commands. If found, use those. Otherwise, auto-detect:
 
-If lint/check/test fails:
+- `mise.toml` exists: run `mise tasks ls`, then `mise run <task>` for tasks matching `fmt`/`format`, `lint`/`check`, `test`
+- `package.json` exists with matching scripts: `npm run format`, `npm run lint`, `npm run test`
+- `Makefile` exists with matching targets: `make fmt`, `make lint`, `make test`
+
+If no commands are found and no config files exist, skip verification and report `VERIFICATION: SKIPPED — no fmt/lint/test commands found`.
+
+**Steps:**
+
+1. **Format:** Run the format command (expected to modify files)
+2. **Lint:** Run the lint command
+   - If lint fails, fix errors **only in files you modified** this session. Do not fix pre-existing lint issues.
+   - Re-run format then lint. Attempt up to 2 fix-and-recheck cycles; if lint still fails, stop and report remaining errors.
+3. **Test:** Run the test command
+
+If lint/check/test still fails:
 
 - Include the error output in your response
 - Mark the relevant fix as FAILED with the error
