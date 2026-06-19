@@ -19,7 +19,16 @@ You will receive a path to an input file. This may be a diff, a spec, a plan, or
 
 ## Prior Context (if provided)
 
-Your prompt may include sections titled "Design Decisions", "Prior Findings", and "Covered Regions". Rules: do NOT flag design decisions as issues; do NOT re-report prior findings; prioritize uncovered regions but you may still report _new_ issues in covered regions.
+Your prompt may include sections titled "Project Context", "Design Decisions", "Prior Findings", and "Covered Regions". Rules:
+
+- **Project Context:** If your prompt includes a "Project Context" section (version, deployment model, status), use it to calibrate severity:
+  - v0.x.0 projects: breaking changes are expected and acceptable per semver — flag them as **suggestion**, not **critical** or **warning**. The change "API breaking changes are expected" still applies at v0.x.0.
+  - v1+ public libraries: breaking changes require major version bump — flag as **critical** or **warning**.
+  - Internal tools with no external consumers: breaking changes are **suggestion**-level (internal reorganization risk only).
+  - Private/unpublished packages: breaking changes are **suggestion**, unless the project explicitly targets v1+ stability.
+- **Design Decisions:** Do NOT flag design decisions as issues; do NOT suggest alternatives.
+- **Prior Findings:** Do NOT re-report prior findings.
+- **Covered Regions:** Prioritize uncovered regions but you may still report _new_ issues in covered regions.
 
 Your prompt may also begin with framing directives (e.g., novelty-seeking instructions). Follow those directives in addition to the rules above.
 
@@ -57,9 +66,11 @@ Write your review to the output path provided. Use this format for each finding:
 
 Severity guide:
 
-- **critical:** Public API or data contract broken with no migration path
-- **warning:** Behavior change that may break some consumers silently
-- **suggestion:** Internal change that could become breaking if exposed later
+- **critical:** Public API or data contract broken with no migration path (or v1+ library with breaking change and no major version bump)
+- **warning:** Behavior change that may break some consumers silently (or v1+ breaking change that should have bumped major version)
+- **suggestion:** Internal change that could become breaking if exposed later (or v0.x.0 breaking API change — these are expected per semver)
+
+Note: For v0.x.0 projects, apply the semver exemption — breaking changes are expected during pre-1.0 development. Downgrade breaking API changes to **suggestion** unless they create data loss or irreversible corruption.
 
 If you find no issues, write: "No compatibility issues found."
 

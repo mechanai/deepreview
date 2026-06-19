@@ -15,7 +15,21 @@ STEP 1: DETERMINE INPUT
 - Set ALL_SESSION_DIRS=[] (list of all session directories used, in order)
 - Determine REPO_ROOT — the main repository root (not a worktree root). Run:
   `REPO_ROOT=$(realpath "$(git rev-parse --git-common-dir)" | sed 's|/\.git$||')`
-- If CONTEXT_FILE exists, set PRIOR_CONTEXT="## Design Decisions (intentional — do not flag)\nThe following are deliberate design choices. Do NOT flag these as issues or suggest alternatives.\n`\n" + contents of CONTEXT_FILE + "\n`\n\n"
+
+Extract PROJECT_CONTEXT by detecting project metadata (version, deployment model, publish status):
+
+- Check for package.json or Cargo.toml to detect version and publish status
+- Check for .deepreview.yml to detect explicit deployment model (threatModel field)
+- If no .deepreview.yml exists, infer deployment model: v0.x.0 and private packages are "internal-network", v1+.x.x and public are "public-facing", otherwise "unknown"
+- Format as a calibration preamble with version info, deployment model, and guidance for severity adjustment
+- If metadata extraction fails or no version info is found, set PROJECT_CONTEXT="" (empty string)
+
+Build PRIOR_CONTEXT:
+
+- Start with PROJECT_CONTEXT (if non-empty)
+- If CONTEXT_FILE exists, append:
+  "## Design Decisions (intentional — do not flag)\nThe following are deliberate design choices. Do NOT flag these as issues or suggest alternatives.\n`\n" + contents of CONTEXT_FILE + "\n`\n\n"
+- If neither PROJECT_CONTEXT nor CONTEXT_FILE exist, set PRIOR_CONTEXT="" (empty string)
 
 STEP 2: RUN INITIAL DEEPREVIEW-SPEC (full pipeline with cross-validation)
 Run the full deepreview-spec pipeline (Stages 1-5 from the deepreview-spec command):

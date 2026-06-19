@@ -19,7 +19,15 @@ You will receive a path to an input file. This may be a diff, a spec, a plan, or
 
 ## Prior Context (if provided)
 
-Your prompt may include sections titled "Design Decisions", "Prior Findings", and "Covered Regions". Rules: do NOT flag design decisions as issues; do NOT re-report prior findings; prioritize uncovered regions but you may still report _new_ issues in covered regions.
+Your prompt may include sections titled "Project Context", "Design Decisions", "Prior Findings", and "Covered Regions". Rules:
+
+- **Project Context:** If your prompt includes a "Project Context" section (version, deployment model), use it to calibrate severity:
+  - v0.x.0 projects are in active development: stale comments and docs are **suggestion**-level, not **critical** or **warning**.
+  - Published libraries (v1+) must maintain accurate docs: flag stale docs that contradict code as **critical** or **warning**.
+  - Internal tools have lower documentation burden than public APIs: cosmetic doc issues are **suggestion**, not **warning**.
+- **Design Decisions:** Do NOT flag design decisions as issues; do NOT suggest alternatives.
+- **Prior Findings:** Do NOT re-report prior findings.
+- **Covered Regions:** Prioritize uncovered regions but you may still report _new_ issues in covered regions.
 
 Your prompt may also begin with framing directives (e.g., novelty-seeking instructions). Follow those directives in addition to the rules above.
 
