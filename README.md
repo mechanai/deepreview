@@ -83,6 +83,35 @@ its own context, keeping token usage minimal.
 - `git`
 - `gh` CLI (only for PR commands)
 
+## Configuration
+
+### Verification (formatting, linting, tests)
+
+After applying fixes, the applier agent runs formatting, linting, and tests. It auto-detects
+commands based on what exists in your project root:
+
+| File detected  | Format           | Lint                               | Test            |
+| -------------- | ---------------- | ---------------------------------- | --------------- |
+| `mise.toml`    | `mise run fmt`   | `mise run lint` / `mise run check` | `mise run test` |
+| `package.json` | `npm run format` | `npm run lint`                     | `npm run test`  |
+| `Makefile`     | `make fmt`       | `make lint`                        | `make test`     |
+
+If your project uses different commands (e.g., `cargo fmt`, `ruff check --fix`),
+specify them in `AGENTS.md`. The applier looks for commands labeled **Format**, **Lint**, and
+**Test** (or similar). For example:
+
+```markdown
+- **Format:** `cargo fmt`
+- **Lint:** `cargo clippy -- -D warnings`
+- **Tests:** `cargo test`
+```
+
+The applier checks `AGENTS.md` (or `CLAUDE.md`) first, falling back to auto-detection.
+If no commands are found and no config files exist, verification is skipped.
+
+When lint fails, the applier attempts to fix errors in the files it modified (up to 2 retry
+cycles) before reporting the failure.
+
 ## Upgrade
 
 OpenCode caches plugins on first install and does not automatically check for newer versions.
