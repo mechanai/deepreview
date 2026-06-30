@@ -124,6 +124,11 @@ Set PRIOR_CONTEXT to the returned text. Validate that it contains "## Prior Find
 The REVIEWER_PREAMBLE for all iter2+ reviewers is:
 "Your goal is to find issues that PREVIOUS reviewers missed. Do NOT re-report, verify, or comment on prior findings.
 
+When you encounter a potential issue:
+
+1. Check "Known Issue Locations" — if your finding is at or near a listed location, it is almost certainly already reported. Only report it if the mechanism is genuinely different (not just differently worded).
+2. Check "Prior Findings" — if your finding matches an existing mechanism description (even at a different location), it is a variant of an already-reported issue. Do not report it.
+
 $PRIOR_CONTEXT
 
 Find genuinely new issues. You may find different issues in covered regions, but prioritize areas not yet examined. Focus ONLY on objective issues — do NOT flag stylistic preferences."
