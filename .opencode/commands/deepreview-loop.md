@@ -134,7 +134,19 @@ Task — Use the Task tool with subagent_type="general":
 
 ## Prior Findings (already reported — do not re-report or verify)
 
-- [Short Issue Title] ([category]) — [file:line]
+For each finding, include the title, category, location, AND a 1-sentence mechanism description explaining what the underlying problem is:
+
+- [Short Issue Title] ([category]) — [file:line] — [1-sentence description of the underlying mechanism/problem]
+
+Example:
+
+- Missing semaphore guard (architecture) — src/module.rs:245 — concurrent operations share mutable state without synchronization
+
+## Known Issue Locations (same file:line = likely same issue — justify if reporting again)
+
+List every file:line from Prior Findings in a condensed location-first index:
+
+- [file:line] — [condensed mechanism] ([category])
 
 ## Applied Fixes (changes made by previous iterations — new bugs here are regressions)
 
@@ -144,7 +156,7 @@ Task — Use the Task tool with subagent_type="general":
 
 - [file:line-range] (pad each finding's file:line by 20 lines in each direction)
 
-Deduplicate findings that appear in multiple syntheses. Return ONLY these three sections, nothing else."
+Deduplicate findings that appear in multiple syntheses. Return ONLY these four sections, nothing else."
 
 Set PRIOR_CONTEXT to the returned text. Validate that it contains "## Prior Findings" — if not, warn the user ("Helper returned malformed prior context — proceeding without deduplication") and set PRIOR_CONTEXT="". If CONTEXT_FILE exists, prepend:
 "## Design Decisions (intentional — do not flag)\nThe following are deliberate design choices. Do NOT flag these as issues or suggest alternatives.\n`\n" + contents of CONTEXT_FILE + "\n`\n\n"
@@ -155,7 +167,14 @@ Stage 1 — DISPATCH 5 PARALLEL REVIEWERS:
 Each reviewer prompt MUST include PRIOR_CONTEXT and the novelty-seeking framing below.
 
 The REVIEWER_PREAMBLE for all iter2+ reviewers is:
-"Your goal is to find issues that PREVIOUS reviewers missed. Do NOT re-report, verify, or comment on prior findings. If you find a bug in code listed under 'Applied Fixes', flag it as a regression.
+"Your goal is to find issues that PREVIOUS reviewers missed. Do NOT re-report, verify, or comment on prior findings.
+
+When you encounter a potential issue:
+
+1. Check "Known Issue Locations" — if your finding is at or near a listed location, it is almost certainly already reported. Only report it if the mechanism is genuinely different (not just differently worded).
+2. Check "Prior Findings" — if your finding matches an existing mechanism description (even at a different location), it is a variant of an already-reported issue. Do not report it.
+
+If you find a bug in code listed under 'Applied Fixes', flag it as a regression.
 
 $PRIOR_CONTEXT
 
