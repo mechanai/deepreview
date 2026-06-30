@@ -167,7 +167,14 @@ Stage 1 — DISPATCH 5 PARALLEL REVIEWERS:
 Each reviewer prompt MUST include PRIOR_CONTEXT and the novelty-seeking framing below.
 
 The REVIEWER_PREAMBLE for all iter2+ reviewers is:
-"Your goal is to find issues that PREVIOUS reviewers missed. Do NOT re-report, verify, or comment on prior findings. If you find a bug in code listed under 'Applied Fixes', flag it as a regression.
+"Your goal is to find issues that PREVIOUS reviewers missed. Do NOT re-report, verify, or comment on prior findings.
+
+When you encounter a potential issue:
+
+1. Check "Known Issue Locations" — if your finding is at or near a listed location, it is almost certainly already reported. Only report it if the mechanism is genuinely different (not just differently worded).
+2. Check "Prior Findings" — if your finding matches an existing mechanism description (even at a different location), it is a variant of an already-reported issue. Do not report it.
+
+If you find a bug in code listed under 'Applied Fixes', flag it as a regression.
 
 $PRIOR_CONTEXT
 
