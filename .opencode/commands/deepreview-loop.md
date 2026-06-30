@@ -134,7 +134,19 @@ Task — Use the Task tool with subagent_type="general":
 
 ## Prior Findings (already reported — do not re-report or verify)
 
-- [Short Issue Title] ([category]) — [file:line]
+For each finding, include the title, category, location, AND a 1-sentence mechanism description explaining what the underlying problem is:
+
+- [Short Issue Title] ([category]) — [file:line] — [1-sentence description of the underlying mechanism/problem]
+
+Example:
+
+- Missing semaphore guard (architecture) — src/module.rs:245 — concurrent operations share mutable state without synchronization
+
+## Known Issue Locations (same file:line = likely same issue — justify if reporting again)
+
+List every file:line from Prior Findings in a condensed location-first index:
+
+- [file:line] — [condensed mechanism] ([category])
 
 ## Applied Fixes (changes made by previous iterations — new bugs here are regressions)
 
@@ -144,7 +156,7 @@ Task — Use the Task tool with subagent_type="general":
 
 - [file:line-range] (pad each finding's file:line by 20 lines in each direction)
 
-Deduplicate findings that appear in multiple syntheses. Return ONLY these three sections, nothing else."
+Deduplicate findings that appear in multiple syntheses. Return ONLY these four sections, nothing else."
 
 Set PRIOR_CONTEXT to the returned text. Validate that it contains "## Prior Findings" — if not, warn the user ("Helper returned malformed prior context — proceeding without deduplication") and set PRIOR_CONTEXT="". If CONTEXT_FILE exists, prepend:
 "## Design Decisions (intentional — do not flag)\nThe following are deliberate design choices. Do NOT flag these as issues or suggest alternatives.\n`\n" + contents of CONTEXT_FILE + "\n`\n\n"
