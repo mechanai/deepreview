@@ -94,7 +94,19 @@ Task — Use the Task tool with subagent_type="general":
 
 ## Prior Findings (already reported — do not re-report or verify)
 
-- [Short Issue Title] ([category]) — [file:line or section reference]
+For each finding, include the title, category, location, AND a 1-sentence mechanism description explaining what the underlying problem is:
+
+- [Short Issue Title] ([category]) — [file:line or section reference] — [1-sentence description of the underlying mechanism/problem]
+
+Example:
+
+- Missing error recovery path (completeness) — spec.md:§3.2 — no defined behavior when upstream service returns partial data
+
+## Known Issue Locations (same location = likely same issue — justify if reporting again)
+
+List every location from Prior Findings in a condensed location-first index:
+
+- [file:line or section reference] — [condensed mechanism] ([category])
 
 ## Applied Fixes (changes made by previous iterations — new bugs here are regressions)
 
@@ -104,7 +116,7 @@ Task — Use the Task tool with subagent_type="general":
 
 - [file or section references, padded generously around each finding location]
 
-Deduplicate findings that appear in multiple syntheses. Return ONLY these three sections, nothing else."
+Deduplicate findings that appear in multiple syntheses. Return ONLY these four sections, nothing else."
 
 Set PRIOR_CONTEXT to the returned text. Validate that it contains "## Prior Findings" — if not, warn the user ("Helper returned malformed prior context — proceeding without deduplication") and set PRIOR_CONTEXT="". If CONTEXT_FILE exists, prepend:
 "## Design Decisions (intentional — do not flag)\nThe following are deliberate design choices. Do NOT flag these as issues or suggest alternatives.\n`\n" + contents of CONTEXT_FILE + "\n`\n\n"
