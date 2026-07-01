@@ -143,19 +143,17 @@ const THREAD_COMMENTS_QUERY = `
   }
 `;
 
-// oxlint-disable-next-line max-lines-per-function -- Why: function orchestrates two nested pagination loops (thread pages + per-thread comment pages) with shared deadline; splitting would require threading state across helper functions without clarity gain
-export async function fetchPrReviewThreads(
+async function paginateThreads(
   owner: string,
   name: string,
   prNumber: number,
-): Promise<{ prBody: string; threads: ReviewThread[] }> {
-  const deadline = Date.now() + AGGREGATE_TIMEOUT_MS;
-  const allThreadNodes: GQLThreadNode[] = [];
+  deadline: number,
+): Promise<{ prBody: string; nodes: GQLThreadNode[] }> {
+  const nodes: GQLThreadNode[] = [];
   let prBody = "";
   let after: string | null = null;
   let pages = 0;
 
-  // Paginate review threads
   while (pages < MAX_THREAD_PAGES) {
     if (Date.now() > deadline) {
       console.warn(
@@ -177,7 +175,7 @@ export async function fetchPrReviewThreads(
 
     if (pages === 1) prBody = pr.body;
 
-    allThreadNodes.push(...pr.reviewThreads.nodes);
+    nodes.push(...pr.reviewThreads.nodes);
 
     if (!pr.reviewThreads.pageInfo.hasNextPage) break;
     after = pr.reviewThreads.pageInfo.endCursor;
@@ -189,8 +187,11 @@ export async function fetchPrReviewThreads(
     );
   }
 
-  // Paginate comments for threads that have more
-  for (const thread of allThreadNodes) {
+  return { prBody, nodes };
+}
+
+async function paginateThreadComments(nodes: GQLThreadNode[], deadline: number): Promise<void> {
+  for (const thread of nodes) {
     if (!thread.comments.pageInfo.hasNextPage) continue;
     if (Date.now() > deadline) {
       console.warn(
@@ -215,6 +216,17 @@ export async function fetchPrReviewThreads(
       commentAfter = data.node.comments.pageInfo.endCursor;
     }
   }
+}
 
-  return { prBody, threads: mapGraphQLThreads(allThreadNodes) };
+export async function fetchPrReviewThreads(
+  owner: string,
+  name: string,
+  prNumber: number,
+): Promise<{ prBody: string; threads: ReviewThread[] }> {
+  const deadline = Date.now() + AGGREGATE_TIMEOUT_MS;
+
+  const { prBody, nodes } = await paginateThreads(owner, name, prNumber, deadline);
+  await paginateThreadComments(nodes, deadline);
+
+  return { prBody, threads: mapGraphQLThreads(nodes) };
 }
