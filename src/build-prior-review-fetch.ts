@@ -79,6 +79,7 @@ function classifyAuthorType(
   return "human";
 }
 
+/** Map raw GraphQL thread nodes to domain ReviewThread objects with author classification. */
 export function mapGraphQLThreads(nodes: GQLThreadNode[]): ReviewThread[] {
   return nodes.map((node) => ({
     path: node.path,
@@ -218,6 +219,7 @@ async function paginateThreadComments(nodes: GQLThreadNode[], deadline: number):
   }
 }
 
+/** Fetch PR body and all review threads via paginated GraphQL queries. */
 export async function fetchPrReviewThreads(
   owner: string,
   name: string,

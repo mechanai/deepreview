@@ -5,6 +5,7 @@ import { getPrInfo } from "./graphql.ts";
 import { fetchPrReviewThreads, mapGraphQLThreads } from "./build-prior-review-fetch.ts";
 export { fetchPrReviewThreads, mapGraphQLThreads };
 
+/** A single comment within a review thread. */
 export interface ThreadComment {
   authorLogin: string;
   authorType: "human" | "bot" | "deepreview";
@@ -12,6 +13,7 @@ export interface ThreadComment {
   createdAt: string;
 }
 
+/** A review thread attached to a file path and line range. */
 export interface ReviewThread {
   path: string;
   startLine: number | null;
@@ -70,6 +72,7 @@ function formatFixedSections(prBody: string, manualContent: string | null): stri
   return sections;
 }
 
+/** Format threads and PR context into a Markdown document grouped by file path. */
 export function formatPriorReview(
   prBody: string,
   threads: ReviewThread[],
@@ -113,6 +116,7 @@ export function formatPriorReview(
   return sections.join("\n\n");
 }
 
+/** Truncate content to fit within a byte-length budget using binary search. */
 export function truncateToFit(content: string, maxBytes: number = MAX_BYTES): string {
   const byteLength = Buffer.byteLength(content, "utf8");
   if (byteLength <= maxBytes) return content;
@@ -141,6 +145,10 @@ function newestCommentTimestamp(thread: ReviewThread): string {
   return thread.comments[thread.comments.length - 1].createdAt;
 }
 
+/**
+ * Assemble a prior-review document with priority-aware truncation.
+ * PR description and manual content are always kept; oldest threads are dropped first.
+ */
 export function buildPriorReviewContent(
   prBody: string,
   threads: ReviewThread[],
@@ -195,12 +203,17 @@ export function buildPriorReviewContent(
 }
 
 export interface BuildPriorReviewOptions {
+  /** PR number to fetch context from. */
   prNumber: number;
+  /** Path to write the generated prior-review file. */
   outputPath: string;
+  /** Path to a user-provided prior-review file to merge in. */
   manualPriorReview?: string;
+  /** Working directory for path resolution and `gh` commands. */
   cwd?: string;
 }
 
+/** Fetch PR context from GitHub, format it, and write the prior-review file. */
 export async function buildPriorReview(opts: BuildPriorReviewOptions): Promise<string> {
   const { prNumber, outputPath, manualPriorReview } = opts;
   const cwd = opts.cwd ?? process.cwd();
