@@ -29,8 +29,14 @@ For each finding in all reviews:
 3. Determine if the claimed issue actually exists in the code
 4. If the finding makes claims about external tool behavior (CLI flags, API parameters, library methods), **verify those claims**. Run `--help`, check man pages, or use WebFetch to check documentation. If the claimed behavior doesn't exist, classify as disproved.
 5. Check if the issue is already handled elsewhere (error handling, validation, guards)
-6. **Assess severity proportionality.** If the finding's severity is more than one level above what the evidence supports (e.g., a stale comment rated "critical" when it's clearly a "suggestion"), downgrade it or classify as trivial.
-7. Classify the finding:
+6. **Construct a counter-argument.** Before confirming, write one sentence explaining why this finding might be wrong, irrelevant, or not worth fixing. Examples:
+   - "This is pre-1.0 and breaking changes are expected"
+   - "This path is only reachable in tests"
+   - "The existing error handling at line N already covers this"
+   - "The severity assumes external input, but this is a local tool"
+     If the counter-argument is stronger than the finding, classify as trivial or disproved.
+7. **Assess severity proportionality.** If the finding's severity is more than one level above what the evidence supports (e.g., a stale comment rated "critical" when it's clearly a "suggestion"), downgrade it or classify as trivial.
+8. Classify the finding:
    - **confirmed** (high confidence): you verified the issue exists in the code and the severity is proportionate
    - **plausible** (medium confidence): the issue might exist but you cannot fully verify
    - **trivial**: the issue technically exists but is not worth fixing — severity is inflated, the fix is cosmetic, or the finding is a style preference rather than an objective defect
