@@ -23,6 +23,22 @@ You will receive a path to a synthesis file. Read it.
 2. For each finding, read ONLY the specific function or block referenced (use the Read tool with offset/limit to read ~50 lines around the referenced line — do NOT read entire files)
 3. Write exact code changes for each fix
 
+## Documentation Drift handling
+
+If the synthesis contains a "Documentation Drift" section with a batched checklist, consolidate all those items into a **single** fix entry in the plan. Do not create separate fix entries for each documentation item. Use this format:
+
+```
+### Fix [N]: Documentation Updates
+**File(s):** [list all affected files]
+**Priority:** suggestion
+**Approach:** Batch update stale/verbose documentation
+**Code changes:**
+[Group changes by file. For each file, show the exact text replacement.]
+**Verification:** Confirm updated docs match current code behavior
+```
+
+Critical documentation findings (which appear individually in the "Critical Issues" section, not in "Documentation Drift") should still get their own fix entries.
+
 ## Quality rules
 
 - **One clean solution per fix.** Do not include your reasoning process, rejected approaches, or self-corrections in the output. If you are unsure which approach is best, pick the simplest one and add a one-line "Alternative:" note.

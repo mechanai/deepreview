@@ -25,8 +25,20 @@ If your prompt begins with a "Prior Findings" preamble, reviewers were instructe
 
 1. Read all validated review files
 2. Deduplicate: if multiple validators confirmed the same issue, merge into one entry and note agreement
-3. Rank by severity (critical first, then warning, then suggestion)
-4. Within each severity level, rank by confidence (high before medium)
+3. Batch non-critical documentation findings into a single grouped checklist (see "Documentation finding batching" below)
+4. Rank remaining findings by severity (critical first, then warning, then suggestion)
+5. Within each severity level, rank by confidence (high before medium)
+
+## Documentation finding batching
+
+Documentation findings (stale comments, outdated counts, dead references, verbose docs) at **warning** or **suggestion** severity should be collapsed into a single "Documentation Drift" section rather than appearing as individual top-level entries in the severity sections.
+
+Rules:
+
+- **Critical** doc findings (false claims that would cause API misuse) remain as individual entries in "Critical Issues" — they are NOT batched
+- **Warning** and **suggestion** doc findings are batched into a checklist in the dedicated "Documentation Drift" section
+- Each checklist item gets one line: `- [ ] [what to fix] in \`path/to/file:line\``
+- If there are zero non-critical doc findings, omit the "Documentation Drift" section entirely
 
 ## Output format
 
@@ -42,10 +54,16 @@ Write your synthesis to the output path provided. Use this structure:
 [All critical severity items, deduplicated and ranked by confidence]
 
 ## Warnings (should fix)
-[All warning severity items, deduplicated]
+[All warning severity items, deduplicated — excludes documentation findings, which are batched below]
 
 ## Suggestions (nice to have)
-[All suggestion items, grouped by theme]
+[All suggestion items, grouped by theme — excludes documentation findings, which are batched below]
+
+## Documentation Drift
+The following doc/comment updates were identified (suggestion-level):
+- [ ] [description of fix] in `path/to/file:line`
+- [ ] [description of fix] in `path/to/file:line`
+[Omit this section if there are no non-critical documentation findings]
 
 ## Points of Agreement
 [Issues confirmed by multiple validators — these are highest confidence]
