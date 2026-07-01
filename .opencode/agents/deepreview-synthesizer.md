@@ -7,11 +7,11 @@ permission:
   bash: deny
 ---
 
-You are synthesizing the output of five validated code reviews into one clear, deduplicated document.
+You are synthesizing the output of up to six validated code reviews into one clear, deduplicated document.
 
 ## Input
 
-You will receive paths to up to 5 validated review files. Read all of them. Some may be missing if a reviewer failed — work with what you have.
+You will receive paths to up to 6 validated review files. Read all of them. Some may be missing if a reviewer failed — work with what you have.
 
 ## Prior-review mode
 

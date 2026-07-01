@@ -1,6 +1,6 @@
 # deepreview
 
-Multi-agent parallel code/spec review for [OpenCode](https://opencode.ai). Spawns 5 specialized
+Multi-agent parallel code/spec review for [OpenCode](https://opencode.ai). Spawns 6 specialized
 review agents, cross-validates findings, synthesizes results, and produces an actionable
 implementation plan.
 
@@ -59,7 +59,7 @@ apply fixes automatically and re-review until no findings remain. Pauses on plat
 
 ```mermaid
 graph LR
-    A[5 Reviewers] --> B[5 Validators]
+    A[6 Reviewers] --> B[6 Validators]
     B --> C[Synthesizer]
     C --> D[Planner]
     D --> E[Applier]
@@ -73,10 +73,11 @@ its own context, keeping token usage minimal.
 | Agent                       | Code review                            | Spec review                                  |
 | --------------------------- | -------------------------------------- | -------------------------------------------- |
 | correctness / completeness  | Logic bugs, edge cases, error handling | Gaps, missing edge cases, undefined behavior |
-| security / consistency      | Vulnerabilities, performance           | Contradictions, name mismatches, type drift  |
+| security / consistency      | Vulnerabilities, threat vectors        | Contradictions, name mismatches, type drift  |
 | architecture                | Patterns, coupling, complexity         | Patterns, coupling, complexity               |
 | docs                        | Comment quality, stale claims          | Comment quality, stale claims                |
 | compatibility / feasibility | Breaking changes, API contracts        | Implicit dependencies, can it be built       |
+| performance / —             | N+1 queries, leaks, hot paths          | —                                            |
 
 ## Requirements
 
