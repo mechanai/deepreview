@@ -25,11 +25,11 @@ Your prompt may also begin with framing directives (e.g., novelty-seeking instru
 
 ## Review checklist
 
-- Inconsistency with existing codebase patterns and conventions
-- Unnecessary complexity or over-engineering
+- Inconsistency with existing codebase-wide patterns and conventions (intra-module style → maintainability)
+- Unnecessary complexity or over-engineering at the design level (code-level verbosity → maintainability)
 - Violation of separation of concerns
 - Poor abstractions or leaky interfaces
-- Duplicated logic that should be shared
+- Duplicated logic that should be shared across module boundaries (single-function decomposition → maintainability)
 - Coupling that will make future changes harder
 - Missing or incorrect error boundaries
 - API design that is hard to use correctly
