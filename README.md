@@ -43,6 +43,8 @@ This will:
 /deepreview-spec-loop --context decisions.md spec.md  # Spec loop with design context
 
 /deepreview-pr-review 123     # Review PR and post findings as a pending GitHub review
+/deepreview-pr-review --prior-review findings.md 123  # Include manual prior review
+/deepreview-pr-review --no-prior 123                  # Skip auto-fetching prior context from GitHub
 
 /deepreview-spec spec.md                  # Spec-focused review (completeness, consistency, feasibility)
 /deepreview-spec --context decisions.md spec.md  # Spec review with design context
