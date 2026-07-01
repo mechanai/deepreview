@@ -303,6 +303,14 @@ describe("buildPriorReviewContent: basic behavior", () => {
   });
 });
 
+import { buildPriorReview } from "./build-prior-review.ts";
+
+describe("buildPriorReview (integration shape)", () => {
+  it("exports buildPriorReview as a function", () => {
+    assert.equal(typeof buildPriorReview, "function");
+  });
+});
+
 describe("buildPriorReviewContent: truncation", () => {
   it("drops oldest threads first when over budget", () => {
     const oldThread: ReviewThread = {

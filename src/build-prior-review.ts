@@ -1,4 +1,6 @@
-import { graphql } from "./graphql.ts";
+import { readFile, writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
+import { graphql, getPrInfo } from "./graphql.ts";
 
 export interface ThreadComment {
   authorLogin: string;
@@ -398,4 +400,51 @@ export async function fetchPrReviewThreads(
   }
 
   return { prBody, threads: mapGraphQLThreads(allThreadNodes) };
+}
+
+export interface BuildPriorReviewOptions {
+  prNumber: number;
+  outputPath: string;
+  manualPriorReview?: string;
+  cwd?: string;
+}
+
+export async function buildPriorReview(opts: BuildPriorReviewOptions): Promise<string> {
+  const { prNumber, outputPath, manualPriorReview, cwd } = opts;
+
+  // Get repo info
+  const prInfo = await getPrInfo(prNumber, { cwd });
+
+  // Fetch PR body and review threads
+  const { prBody, threads } = await fetchPrReviewThreads(prInfo.owner, prInfo.name, prNumber);
+
+  // Read manual prior review if provided
+  let manualContent: string | null = null;
+  if (manualPriorReview !== undefined) {
+    const base = cwd ?? process.cwd();
+    const manualPath = resolve(base, manualPriorReview);
+    manualContent = await readFile(manualPath, "utf8");
+  }
+
+  // Build and write
+  const content = buildPriorReviewContent(prBody, threads, manualContent);
+  const resolvedOutput = resolve(cwd ?? process.cwd(), outputPath);
+  await writeFile(resolvedOutput, content, "utf8");
+
+  // Build summary
+  const bytes = Buffer.byteLength(content, "utf8");
+  const kb = (bytes / 1024).toFixed(1);
+  const uniqueAuthors = new Set(threads.flatMap((t) => t.comments.map((c) => c.authorLogin)));
+
+  if (content === "") {
+    return `No prior review content found. Written empty file to ${outputPath}.`;
+  }
+
+  const parts: string[] = [];
+  if (prBody.trim()) parts.push("PR description");
+  if (threads.length > 0)
+    parts.push(`${threads.length} threads from ${uniqueAuthors.size} reviewers`);
+  if (manualContent !== null) parts.push("manual prior review");
+
+  return `Built prior review: ${kb}KB (${parts.join(" + ")}). Written to ${outputPath}.`;
 }
