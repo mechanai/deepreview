@@ -1,6 +1,6 @@
 import { describe, it } from "bun:test";
 import assert from "node:assert/strict";
-import { formatPriorReview, truncateToFit } from "./build-prior-review.ts";
+import { formatPriorReview, mapGraphQLThreads, truncateToFit } from "./build-prior-review.ts";
 import type { ReviewThread, ThreadComment } from "./build-prior-review.ts";
 
 function makeThread(
@@ -132,5 +132,111 @@ describe("truncateToFit", () => {
     const content = "x".repeat(60_000);
     const result = truncateToFit(content, 50_000);
     assert.ok(Buffer.byteLength(result, "utf8") <= 50_000);
+  });
+});
+
+describe("fetchPrReviewThreads", () => {
+  it("is exported as a function", async () => {
+    const { fetchPrReviewThreads } = await import("./build-prior-review.ts");
+    assert.equal(typeof fetchPrReviewThreads, "function");
+  });
+});
+
+describe("mapGraphQLThreads", () => {
+  it("maps GraphQL response nodes to ReviewThread[]", () => {
+    const nodes = [
+      {
+        id: "t1",
+        path: "src/foo.ts",
+        startLine: 10,
+        line: 15,
+        isResolved: false,
+        isOutdated: false,
+        comments: {
+          pageInfo: { hasNextPage: false, endCursor: null },
+          nodes: [
+            {
+              author: { login: "octocat", __typename: "User" },
+              body: "Fix this",
+              createdAt: "2026-01-01T00:00:00Z",
+            },
+          ],
+        },
+      },
+      {
+        id: "t2",
+        path: "src/bar.ts",
+        startLine: null,
+        line: 5,
+        isResolved: true,
+        isOutdated: false,
+        comments: {
+          pageInfo: { hasNextPage: false, endCursor: null },
+          nodes: [
+            {
+              author: { login: "ci-bot[bot]", __typename: "Bot" },
+              body: "Lint error",
+              createdAt: "2026-01-01T00:00:00Z",
+            },
+          ],
+        },
+      },
+    ];
+    const result = mapGraphQLThreads(nodes);
+    assert.equal(result.length, 2);
+    assert.equal(result[0].path, "src/foo.ts");
+    assert.equal(result[0].comments[0].authorType, "human");
+    assert.equal(result[1].comments[0].authorType, "bot");
+    assert.equal(result[1].isResolved, true);
+  });
+
+  it("detects bot by __typename Bot", () => {
+    const nodes = [
+      {
+        id: "t1",
+        path: "a.ts",
+        startLine: null,
+        line: 1,
+        isResolved: false,
+        isOutdated: false,
+        comments: {
+          pageInfo: { hasNextPage: false, endCursor: null },
+          nodes: [
+            {
+              author: { login: "dependabot", __typename: "Bot" },
+              body: "bump",
+              createdAt: "2026-01-01T00:00:00Z",
+            },
+          ],
+        },
+      },
+    ];
+    const result = mapGraphQLThreads(nodes);
+    assert.equal(result[0].comments[0].authorType, "bot");
+  });
+
+  it("detects bot by [bot] suffix when __typename is missing", () => {
+    const nodes = [
+      {
+        id: "t1",
+        path: "a.ts",
+        startLine: null,
+        line: 1,
+        isResolved: false,
+        isOutdated: false,
+        comments: {
+          pageInfo: { hasNextPage: false, endCursor: null },
+          nodes: [
+            {
+              author: { login: "some-bot[bot]", __typename: "User" },
+              body: "x",
+              createdAt: "2026-01-01T00:00:00Z",
+            },
+          ],
+        },
+      },
+    ];
+    const result = mapGraphQLThreads(nodes);
+    assert.equal(result[0].comments[0].authorType, "bot");
   });
 });
