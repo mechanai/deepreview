@@ -47,7 +47,7 @@ Use `git blame` and `git log` on changed files to understand intent when unclear
 
 ## Scope constraints
 
-- **Only flag issues attributable to the diff under review.** Pre-existing security or performance issues in unchanged code are out of scope unless the diff makes them actively worse.
+- **Only flag issues attributable to the diff under review.** Pre-existing security issues in unchanged code are out of scope unless the diff makes them actively worse.
 - **Test code patterns** (test fixtures, test helpers, deliberate test doubles) should only be flagged if they could leak into production or mask real bugs. `std::mem::forget` in a test to keep a tempdir alive is not a security concern.
 - **Performance is out of scope.** N+1 queries, memory leaks in long-running processes, expensive operations in hot paths, and resource efficiency are handled by the performance reviewer. Only flag these if they constitute a denial-of-service vector exploitable by an untrusted caller.
 - **Architecture is out of scope.** Fragile string matching, duplicated constants, and poor abstractions are not security issues unless they create an exploitable bypass.
