@@ -2,7 +2,7 @@ import { graphql } from "./graphql.ts";
 
 export interface ThreadComment {
   authorLogin: string;
-  authorType: "human" | "bot";
+  authorType: "human" | "bot" | "deepreview";
   body: string;
   createdAt: string;
 }
@@ -179,7 +179,14 @@ const AGGREGATE_TIMEOUT_MS = 5 * 60 * 1000;
 
 // --- Mapping ---
 
-function classifyAuthorType(author: GQLCommentAuthor | null): "human" | "bot" {
+const FINDING_ID_RE = /<!-- finding:[a-f0-9]+ -->/u;
+
+function classifyAuthorType(
+  author: GQLCommentAuthor | null,
+  body: string,
+): "human" | "bot" | "deepreview" {
+  // deepreview embeds finding IDs as HTML comments; detect regardless of posting account
+  if (FINDING_ID_RE.test(body)) return "deepreview";
   // ghost/deleted users treated as bot
   if (!author) return "bot";
   if (author.__typename === "Bot" || author.__typename === "Mannequin") return "bot";
@@ -196,7 +203,7 @@ export function mapGraphQLThreads(nodes: GQLThreadNode[]): ReviewThread[] {
     isOutdated: node.isOutdated,
     comments: node.comments.nodes.map((c) => ({
       authorLogin: c.author?.login ?? "ghost",
-      authorType: classifyAuthorType(c.author),
+      authorType: classifyAuthorType(c.author, c.body),
       body: c.body,
       createdAt: c.createdAt,
     })),

@@ -239,4 +239,30 @@ describe("mapGraphQLThreads", () => {
     const result = mapGraphQLThreads(nodes);
     assert.equal(result[0].comments[0].authorType, "bot");
   });
+
+  it("detects deepreview by finding ID HTML comment in body", () => {
+    const nodes = [
+      {
+        id: "t1",
+        path: "src/foo.ts",
+        startLine: null,
+        line: 10,
+        isResolved: false,
+        isOutdated: false,
+        comments: {
+          pageInfo: { hasNextPage: false, endCursor: null },
+          nodes: [
+            {
+              author: { login: "reviewer-human", __typename: "User" },
+              body: "Missing error handling.\n<!-- finding:abc123 -->",
+              createdAt: "2026-01-01T00:00:00Z",
+            },
+          ],
+        },
+      },
+    ];
+    const result = mapGraphQLThreads(nodes);
+    assert.equal(result[0].comments[0].authorType, "deepreview");
+    assert.equal(result[0].comments[0].authorLogin, "reviewer-human");
+  });
 });
