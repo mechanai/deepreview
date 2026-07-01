@@ -41,7 +41,6 @@ function formatSourceTag(comment: ThreadComment, thread: ReviewThread): string {
 
 function formatCommentBody(body: string, indent: string): string {
   if (!body.includes("\n")) return `"${body}"`;
-  // Multi-line: indent each line as a blockquote under the bullet
   const lines = body.split("\n").map((line) => `${indent}> ${line}`);
   return "\n" + lines.join("\n");
 }
@@ -147,7 +146,6 @@ export function buildPriorReviewContent(
   threads: ReviewThread[],
   manualContent: string | null,
 ): string {
-  // If all inputs are empty, return empty
   if (
     !prBody.trim() &&
     threads.length === 0 &&
@@ -156,23 +154,20 @@ export function buildPriorReviewContent(
     return "";
   }
 
-  // Build fixed sections (PR description + manual) that are always kept
   const fixedSections = formatFixedSections(prBody, manualContent);
   const fixedContent = fixedSections.join("\n\n");
 
-  // If no threads, just return fixed content (potentially truncated)
   if (threads.length === 0) {
     return truncateToFit(fixedContent, MAX_BYTES);
   }
 
-  // Sort threads by newest comment timestamp descending — newest retained first
+  // Newest threads are retained first; oldest dropped when over budget
   const sortedByRecency = [...threads].sort((a, b) =>
     newestCommentTimestamp(b).localeCompare(newestCommentTimestamp(a)),
   );
 
-  // Greedily keep newest threads that fit within the budget.
-  // We estimate bytes using formatThread + file header overhead, then do a
-  // final safety pass with truncateToFit.
+  // Estimate bytes per thread (formatThread + file header overhead).
+  // truncateToFit is the safety net if our estimate is slightly off.
   const fixedBytes = Buffer.byteLength(fixedContent, "utf8");
   const separator = "\n\n";
   const separatorBytes = Buffer.byteLength(separator, "utf8");
@@ -195,10 +190,7 @@ export function buildPriorReviewContent(
     }
   }
 
-  // formatPriorReview handles final ordering (by file path / line number)
   const result = formatPriorReview(prBody, keptThreads, manualContent);
-
-  // Final safety check in case our byte estimate was off
   return truncateToFit(result, MAX_BYTES);
 }
 
@@ -210,36 +202,27 @@ export interface BuildPriorReviewOptions {
 }
 
 export async function buildPriorReview(opts: BuildPriorReviewOptions): Promise<string> {
-  const { prNumber, outputPath, manualPriorReview, cwd } = opts;
+  const { prNumber, outputPath, manualPriorReview } = opts;
+  const cwd = opts.cwd ?? process.cwd();
 
-  // Get repo info
   const prInfo = await getPrInfo(prNumber, { cwd });
-
-  // Fetch PR body and review threads
   const { prBody, threads } = await fetchPrReviewThreads(prInfo.owner, prInfo.name, prNumber);
 
-  // Read manual prior review if provided
   let manualContent: string | null = null;
   if (manualPriorReview !== undefined) {
-    const base = cwd ?? process.cwd();
-    const manualPath = resolve(base, manualPriorReview);
-    manualContent = await readFile(manualPath, "utf8");
+    manualContent = await readFile(resolve(cwd, manualPriorReview), "utf8");
   }
 
-  // Build and write
   const content = buildPriorReviewContent(prBody, threads, manualContent);
-  const resolvedOutput = resolve(cwd ?? process.cwd(), outputPath);
-  await writeFile(resolvedOutput, content, "utf8");
-
-  // Build summary
-  const bytes = Buffer.byteLength(content, "utf8");
-  const kb = (bytes / 1024).toFixed(1);
-  const uniqueAuthors = new Set(threads.flatMap((t) => t.comments.map((c) => c.authorLogin)));
+  await writeFile(resolve(cwd, outputPath), content, "utf8");
 
   if (content === "") {
     return `No prior review content found. Written empty file to ${outputPath}.`;
   }
 
+  const bytes = Buffer.byteLength(content, "utf8");
+  const kb = (bytes / 1024).toFixed(1);
+  const uniqueAuthors = new Set(threads.flatMap((t) => t.comments.map((c) => c.authorLogin)));
   const parts: string[] = [];
   if (prBody.trim()) parts.push("PR description");
   if (threads.length > 0)
