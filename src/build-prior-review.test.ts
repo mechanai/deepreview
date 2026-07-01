@@ -1,6 +1,11 @@
 import { describe, it } from "bun:test";
 import assert from "node:assert/strict";
-import { formatPriorReview, mapGraphQLThreads, truncateToFit } from "./build-prior-review.ts";
+import {
+  buildPriorReviewContent,
+  formatPriorReview,
+  mapGraphQLThreads,
+  truncateToFit,
+} from "./build-prior-review.ts";
 import type { ReviewThread, ThreadComment } from "./build-prior-review.ts";
 
 function makeThread(
@@ -264,5 +269,101 @@ describe("mapGraphQLThreads", () => {
     const result = mapGraphQLThreads(nodes);
     assert.equal(result[0].comments[0].authorType, "deepreview");
     assert.equal(result[0].comments[0].authorLogin, "reviewer-human");
+  });
+});
+
+describe("buildPriorReviewContent: basic behavior", () => {
+  it("keeps all content when under budget", () => {
+    const threads: ReviewThread[] = [
+      {
+        path: "a.ts",
+        startLine: null,
+        line: 1,
+        isResolved: false,
+        isOutdated: false,
+        comments: [
+          {
+            authorLogin: "a",
+            authorType: "human",
+            body: "small",
+            createdAt: "2026-01-01T00:00:00Z",
+          },
+        ],
+      },
+    ];
+    const result = buildPriorReviewContent("PR body", threads, "manual");
+    assert.ok(result.includes("PR body"));
+    assert.ok(result.includes("small"));
+    assert.ok(result.includes("manual"));
+  });
+
+  it("returns empty string when all inputs empty", () => {
+    const result = buildPriorReviewContent("", [], null);
+    assert.equal(result, "");
+  });
+});
+
+describe("buildPriorReviewContent: truncation", () => {
+  it("drops oldest threads first when over budget", () => {
+    const oldThread: ReviewThread = {
+      path: "old.ts",
+      startLine: null,
+      line: 1,
+      isResolved: false,
+      isOutdated: false,
+      comments: [
+        {
+          authorLogin: "a",
+          authorType: "human",
+          body: "x".repeat(20_000),
+          createdAt: "2020-01-01T00:00:00Z",
+        },
+      ],
+    };
+    const newThread: ReviewThread = {
+      path: "new.ts",
+      startLine: null,
+      line: 1,
+      isResolved: false,
+      isOutdated: false,
+      comments: [
+        {
+          authorLogin: "b",
+          authorType: "human",
+          body: "y".repeat(20_000),
+          createdAt: "2026-06-01T00:00:00Z",
+        },
+      ],
+    };
+    const result = buildPriorReviewContent("PR body", [oldThread, newThread], null);
+    const bytes = Buffer.byteLength(result, "utf8");
+    assert.ok(bytes <= 50 * 1024, `Expected <= 50KB, got ${bytes}`);
+    assert.ok(result.includes("new.ts"));
+  });
+
+  it("preserves PR description and manual content even when threads are large", () => {
+    const bigThread: ReviewThread = {
+      path: "big.ts",
+      startLine: null,
+      line: 1,
+      isResolved: false,
+      isOutdated: false,
+      comments: [
+        {
+          authorLogin: "a",
+          authorType: "human",
+          body: "z".repeat(45_000),
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+      ],
+    };
+    const result = buildPriorReviewContent(
+      "Important PR description",
+      [bigThread],
+      "Critical manual notes",
+    );
+    assert.ok(result.includes("Important PR description"));
+    assert.ok(result.includes("Critical manual notes"));
+    assert.ok(Buffer.byteLength(result, "utf8") <= 50 * 1024);
   });
 });

@@ -116,6 +116,73 @@ export function truncateToFit(content: string, maxBytes: number = MAX_BYTES): st
   return content.slice(0, lo) + suffix;
 }
 
+function newestCommentTimestamp(thread: ReviewThread): string {
+  if (thread.comments.length === 0) return "1970-01-01T00:00:00Z";
+  return thread.comments[thread.comments.length - 1].createdAt;
+}
+
+export function buildPriorReviewContent(
+  prBody: string,
+  threads: ReviewThread[],
+  manualContent: string | null,
+): string {
+  // If all inputs are empty, return empty
+  if (
+    !prBody.trim() &&
+    threads.length === 0 &&
+    (manualContent === null || manualContent.trim() === "")
+  ) {
+    return "";
+  }
+
+  // Build fixed sections (PR description + manual) that are always kept
+  const fixedSections: string[] = [];
+  if (prBody.trim()) {
+    fixedSections.push(`## PR Description\n\n${prBody.trim()}`);
+  }
+  if (manualContent !== null && manualContent.trim() !== "") {
+    fixedSections.push(`## Manual Prior Review\n\n${manualContent.trim()}`);
+  }
+  const fixedContent = fixedSections.join("\n\n");
+
+  // If no threads, just return fixed content (potentially truncated)
+  if (threads.length === 0) {
+    return truncateToFit(fixedContent, MAX_BYTES);
+  }
+
+  // Sort threads by newest comment timestamp descending — newest retained first
+  const sortedByRecency = [...threads].sort((a, b) =>
+    newestCommentTimestamp(b).localeCompare(newestCommentTimestamp(a)),
+  );
+
+  // Greedily keep newest threads that fit within the budget.
+  // We estimate bytes using formatThread + file header overhead, then do a
+  // final safety pass with truncateToFit.
+  const fixedBytes = Buffer.byteLength(fixedContent, "utf8");
+  const separator = "\n\n";
+  const separatorBytes = Buffer.byteLength(separator, "utf8");
+  const sectionHeaderBytes = Buffer.byteLength("## Prior Review Comments\n\n", "utf8");
+  let budgetRemaining =
+    MAX_BYTES - fixedBytes - (fixedContent ? separatorBytes : 0) - sectionHeaderBytes;
+
+  const keptThreads: ReviewThread[] = [];
+  for (const thread of sortedByRecency) {
+    const threadText = formatThread(thread);
+    const fileHeader = `### ${thread.path}\n\n`;
+    const threadBytes = Buffer.byteLength(threadText + fileHeader, "utf8") + separatorBytes;
+    if (threadBytes <= budgetRemaining) {
+      keptThreads.push(thread);
+      budgetRemaining -= threadBytes;
+    }
+  }
+
+  // formatPriorReview handles final ordering (by file path / line number)
+  const result = formatPriorReview(prBody, keptThreads, manualContent);
+
+  // Final safety check in case our byte estimate was off
+  return truncateToFit(result, MAX_BYTES);
+}
+
 // --- GraphQL types ---
 
 interface GQLPageInfo {
