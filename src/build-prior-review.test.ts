@@ -378,3 +378,291 @@ describe("buildPriorReviewContent: truncation", () => {
     assert.ok(Buffer.byteLength(result, "utf8") <= 50 * 1024);
   });
 });
+
+describe("formatPriorReview: formatCommentBody paths", () => {
+  it("renders multi-line body as indented blockquote", () => {
+    const threads: ReviewThread[] = [
+      {
+        path: "src/multi.ts",
+        startLine: null,
+        line: 1,
+        isResolved: false,
+        isOutdated: false,
+        comments: [
+          {
+            authorLogin: "reviewer",
+            authorType: "human",
+            body: "line one\nline two\nline three",
+            createdAt: "2026-01-01T00:00:00Z",
+          },
+        ],
+      },
+    ];
+    const result = formatPriorReview("", threads, null);
+    assert.ok(result.includes("  > line one"));
+    assert.ok(result.includes("  > line two"));
+    assert.ok(result.includes("  > line three"));
+    // Multi-line bodies should NOT be wrapped in quotes
+    assert.ok(!result.includes('"line one'));
+  });
+
+  it("renders single-line body in quotes", () => {
+    const threads: ReviewThread[] = [
+      {
+        path: "src/single.ts",
+        startLine: null,
+        line: 1,
+        isResolved: false,
+        isOutdated: false,
+        comments: [
+          {
+            authorLogin: "reviewer",
+            authorType: "human",
+            body: "a single line comment",
+            createdAt: "2026-01-01T00:00:00Z",
+          },
+        ],
+      },
+    ];
+    const result = formatPriorReview("", threads, null);
+    assert.ok(result.includes('"a single line comment"'));
+  });
+});
+
+describe("formatPriorReview: formatLineRef paths", () => {
+  it("renders startLine only when line is null", () => {
+    const threads: ReviewThread[] = [
+      {
+        path: "src/start-only.ts",
+        startLine: 42,
+        line: null,
+        isResolved: false,
+        isOutdated: false,
+        comments: [
+          {
+            authorLogin: "a",
+            authorType: "human",
+            body: "note",
+            createdAt: "2026-01-01T00:00:00Z",
+          },
+        ],
+      },
+    ];
+    const result = formatPriorReview("", threads, null);
+    assert.ok(result.includes("**L42**"));
+    // Should NOT include a range
+    assert.ok(!result.includes("**L42-"));
+  });
+
+  it("renders file-level when both startLine and line are null", () => {
+    const threads: ReviewThread[] = [
+      {
+        path: "src/file-level.ts",
+        startLine: null,
+        line: null,
+        isResolved: false,
+        isOutdated: false,
+        comments: [
+          {
+            authorLogin: "a",
+            authorType: "human",
+            body: "general comment",
+            createdAt: "2026-01-01T00:00:00Z",
+          },
+        ],
+      },
+    ];
+    const result = formatPriorReview("", threads, null);
+    assert.ok(result.includes("**file-level**"));
+  });
+});
+
+describe("formatPriorReview: formatSourceTag paths", () => {
+  it("renders deepreview author type in source tag", () => {
+    const threads: ReviewThread[] = [
+      {
+        path: "src/dr.ts",
+        startLine: null,
+        line: 5,
+        isResolved: false,
+        isOutdated: false,
+        comments: [
+          {
+            authorLogin: "review-bot",
+            authorType: "deepreview",
+            body: "finding",
+            createdAt: "2026-01-01T00:00:00Z",
+          },
+        ],
+      },
+    ];
+    const result = formatPriorReview("", threads, null);
+    assert.ok(result.includes("[source: @review-bot, deepreview]"));
+  });
+
+  it("renders both resolved and outdated simultaneously", () => {
+    const threads: ReviewThread[] = [
+      {
+        path: "src/both.ts",
+        startLine: null,
+        line: 10,
+        isResolved: true,
+        isOutdated: true,
+        comments: [
+          {
+            authorLogin: "user",
+            authorType: "human",
+            body: "old resolved",
+            createdAt: "2026-01-01T00:00:00Z",
+          },
+        ],
+      },
+    ];
+    const result = formatPriorReview("", threads, null);
+    assert.ok(result.includes("[source: @user, human, resolved, outdated]"));
+  });
+});
+
+describe("formatPriorReview: formatThread empty comments", () => {
+  it("returns empty output for thread with no comments", () => {
+    const threads: ReviewThread[] = [
+      {
+        path: "src/empty.ts",
+        startLine: null,
+        line: 1,
+        isResolved: false,
+        isOutdated: false,
+        comments: [],
+      },
+    ];
+    const result = formatPriorReview("", threads, null);
+    // Empty thread produces no output; no file heading should appear
+    assert.ok(!result.includes("### src/empty.ts"));
+  });
+});
+
+describe("truncateToFit: edge cases", () => {
+  it("handles multi-byte UTF-8 content within byte limit", () => {
+    // Each emoji (😀) is 4 bytes in UTF-8; 15000 repeats ≈ 60KB
+    const emoji = "\u{1F600}";
+    const content = emoji.repeat(15_000);
+    const result = truncateToFit(content, 50_000);
+    const resultBytes = Buffer.byteLength(result, "utf8");
+    assert.ok(resultBytes <= 50_000, `Expected <= 50000 bytes, got ${resultBytes}`);
+    assert.ok(result.includes("[truncated"));
+  });
+
+  it("handles CJK characters within byte limit", () => {
+    // CJK characters are 3 bytes in UTF-8; 20000 repeats ≈ 60KB
+    const content = "\u4e00".repeat(20_000);
+    const result = truncateToFit(content, 50_000);
+    const resultBytes = Buffer.byteLength(result, "utf8");
+    assert.ok(resultBytes <= 50_000, `Expected <= 50000 bytes, got ${resultBytes}`);
+  });
+
+  it("returns content unchanged at exact byte boundary", () => {
+    // Build content whose byte length is exactly maxBytes
+    const maxBytes = 1000;
+    // ASCII: 1 byte per char
+    const content = "a".repeat(maxBytes);
+    assert.equal(Buffer.byteLength(content, "utf8"), maxBytes);
+    const result = truncateToFit(content, maxBytes);
+    assert.equal(result, content);
+  });
+
+  it("includes truncation suffix when truncated", () => {
+    const content = "x".repeat(60_000);
+    const result = truncateToFit(content, 50_000);
+    assert.ok(result.endsWith("[truncated — content exceeds size limit]"));
+  });
+});
+
+// oxlint-disable-next-line max-lines-per-function -- Why: edge case tests require large inline fixtures to exercise byte-budget boundaries
+describe("buildPriorReviewContent: edge cases", () => {
+  it("returns only fixed sections when all threads are too large for budget", () => {
+    // Use a large PR body so the remaining budget is too small for any thread
+    const largePrBody = "P".repeat(20_000);
+    const hugeThreadBody = "z".repeat(40_000);
+    const threads: ReviewThread[] = [
+      {
+        path: "big1.ts",
+        startLine: null,
+        line: 1,
+        isResolved: false,
+        isOutdated: false,
+        comments: [
+          {
+            authorLogin: "a",
+            authorType: "human",
+            body: hugeThreadBody,
+            createdAt: "2026-01-01T00:00:00Z",
+          },
+        ],
+      },
+      {
+        path: "big2.ts",
+        startLine: null,
+        line: 1,
+        isResolved: false,
+        isOutdated: false,
+        comments: [
+          {
+            authorLogin: "b",
+            authorType: "human",
+            body: hugeThreadBody,
+            createdAt: "2026-02-01T00:00:00Z",
+          },
+        ],
+      },
+    ];
+    const result = buildPriorReviewContent(largePrBody, threads, null);
+    assert.ok(result.includes(largePrBody.slice(0, 100)));
+    assert.ok(!result.includes("## Prior Review Comments"));
+  });
+
+  it("counts file header only once for multiple threads sharing same path", () => {
+    const threads: ReviewThread[] = [
+      makeThread("shared/file.ts", 1, [{ login: "a", body: "comment 1" }]),
+      makeThread("shared/file.ts", 5, [{ login: "b", body: "comment 2" }]),
+      makeThread("shared/file.ts", 10, [{ login: "c", body: "comment 3" }]),
+    ];
+    const result = buildPriorReviewContent("", threads, null);
+    // All threads should be present since they share a file header
+    assert.ok(result.includes("comment 1"));
+    assert.ok(result.includes("comment 2"));
+    assert.ok(result.includes("comment 3"));
+    // File header appears exactly once in the output
+    const headerCount = result.split("### shared/file.ts").length - 1;
+    assert.equal(headerCount, 1);
+  });
+
+  it("treats whitespace-only manualContent as empty", () => {
+    const result = buildPriorReviewContent("body", [], "   \n\t  \n  ");
+    assert.ok(!result.includes("## Manual Prior Review"));
+    assert.ok(result.includes("## PR Description"));
+  });
+
+  it("treats whitespace-only prBody as empty", () => {
+    const result = buildPriorReviewContent("  \n  \t  ", [], null);
+    assert.equal(result, "");
+  });
+
+  it("orders sections: PR Description → Prior Review Comments → Manual Prior Review", () => {
+    const threads = [makeThread("src/x.ts", 1, [{ login: "r", body: "finding" }])];
+    const result = buildPriorReviewContent("description", threads, "manual notes");
+    const prDescIdx = result.indexOf("## PR Description");
+    const priorCommentsIdx = result.indexOf("## Prior Review Comments");
+    const manualIdx = result.indexOf("## Manual Prior Review");
+    assert.ok(prDescIdx >= 0, "PR Description section missing");
+    assert.ok(priorCommentsIdx >= 0, "Prior Review Comments section missing");
+    assert.ok(manualIdx >= 0, "Manual Prior Review section missing");
+    assert.ok(
+      prDescIdx < priorCommentsIdx,
+      "PR Description should come before Prior Review Comments",
+    );
+    assert.ok(
+      priorCommentsIdx < manualIdx,
+      "Prior Review Comments should come before Manual Prior Review",
+    );
+  });
+});
