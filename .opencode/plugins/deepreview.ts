@@ -2,7 +2,7 @@ import { type Plugin, type PluginInput, tool } from "@opencode-ai/plugin";
 import { postReview } from "../../src/post-review.ts";
 import { buildPriorReview } from "../../src/build-prior-review.ts";
 
-// oxlint-disable-next-line require-await -- Why: Plugin type signature requires async but this plugin has no async initialization
+// oxlint-disable-next-line require-await, max-lines-per-function -- Why: Plugin type signature requires async but this plugin has no async initialization; function is long due to tool registrations with schema definitions
 export const server: Plugin = async (_input: PluginInput) => {
   return {
     tool: {

@@ -1,3 +1,4 @@
+// oxlint-disable max-lines -- Why: file contains GraphQL types, query strings, mapping, pagination, and the build pipeline; splitting across modules would add unnecessary indirection
 import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { graphql, getPrInfo } from "./graphql.ts";
@@ -168,12 +169,16 @@ export function buildPriorReviewContent(
     MAX_BYTES - fixedBytes - (fixedContent ? separatorBytes : 0) - sectionHeaderBytes;
 
   const keptThreads: ReviewThread[] = [];
+  const seenPaths = new Set<string>();
   for (const thread of sortedByRecency) {
     const threadText = formatThread(thread);
-    const fileHeader = `### ${thread.path}\n\n`;
-    const threadBytes = Buffer.byteLength(threadText + fileHeader, "utf8") + separatorBytes;
+    const fileHeaderBytes = seenPaths.has(thread.path)
+      ? 0
+      : Buffer.byteLength(`### ${thread.path}\n\n`, "utf8");
+    const threadBytes = Buffer.byteLength(threadText, "utf8") + fileHeaderBytes + separatorBytes;
     if (threadBytes <= budgetRemaining) {
       keptThreads.push(thread);
+      seenPaths.add(thread.path);
       budgetRemaining -= threadBytes;
     }
   }
@@ -327,6 +332,7 @@ const THREAD_COMMENTS_QUERY = `
   }
 `;
 
+// oxlint-disable-next-line max-lines-per-function -- Why: function orchestrates two nested pagination loops (thread pages + per-thread comment pages) with shared deadline; splitting would require threading state across helper functions without clarity gain
 export async function fetchPrReviewThreads(
   owner: string,
   name: string,

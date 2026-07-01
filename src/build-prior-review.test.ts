@@ -1,6 +1,8 @@
+// oxlint-disable max-lines -- Why: comprehensive test coverage for mapGraphQLThreads and buildPriorReviewContent requires many inline fixture objects; extracting them would obscure intent
 import { describe, it } from "bun:test";
 import assert from "node:assert/strict";
 import {
+  buildPriorReview,
   buildPriorReviewContent,
   formatPriorReview,
   mapGraphQLThreads,
@@ -147,6 +149,7 @@ describe("fetchPrReviewThreads", () => {
   });
 });
 
+// oxlint-disable-next-line max-lines-per-function -- Why: covers five author-type classification cases; each requires a full GQL node fixture and an assertion; splitting into separate describes would not reduce total lines
 describe("mapGraphQLThreads", () => {
   it("maps GraphQL response nodes to ReviewThread[]", () => {
     const nodes = [
@@ -303,14 +306,13 @@ describe("buildPriorReviewContent: basic behavior", () => {
   });
 });
 
-import { buildPriorReview } from "./build-prior-review.ts";
-
 describe("buildPriorReview (integration shape)", () => {
   it("exports buildPriorReview as a function", () => {
     assert.equal(typeof buildPriorReview, "function");
   });
 });
 
+// oxlint-disable-next-line max-lines-per-function -- Why: two test cases require large inline thread fixtures (20K body strings) to exercise byte-budget truncation; extracting fixtures would obscure the budget arithmetic being tested
 describe("buildPriorReviewContent: truncation", () => {
   it("drops oldest threads first when over budget", () => {
     const oldThread: ReviewThread = {
@@ -323,7 +325,7 @@ describe("buildPriorReviewContent: truncation", () => {
         {
           authorLogin: "a",
           authorType: "human",
-          body: "x".repeat(20_000),
+          body: "x".repeat(30_000),
           createdAt: "2020-01-01T00:00:00Z",
         },
       ],
@@ -338,7 +340,7 @@ describe("buildPriorReviewContent: truncation", () => {
         {
           authorLogin: "b",
           authorType: "human",
-          body: "y".repeat(20_000),
+          body: "y".repeat(30_000),
           createdAt: "2026-06-01T00:00:00Z",
         },
       ],
@@ -347,6 +349,7 @@ describe("buildPriorReviewContent: truncation", () => {
     const bytes = Buffer.byteLength(result, "utf8");
     assert.ok(bytes <= 50 * 1024, `Expected <= 50KB, got ${bytes}`);
     assert.ok(result.includes("new.ts"));
+    assert.ok(!result.includes("old.ts"), "old thread should have been dropped");
   });
 
   it("preserves PR description and manual content even when threads are large", () => {
