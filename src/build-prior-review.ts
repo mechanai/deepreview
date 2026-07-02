@@ -15,6 +15,7 @@ export interface ThreadComment {
 
 /** A review thread attached to a file path and line range. */
 export interface ReviewThread {
+  id: string;
   path: string;
   startLine: number | null;
   line: number | null;

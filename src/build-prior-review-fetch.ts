@@ -82,6 +82,7 @@ function classifyAuthorType(
 /** Map raw GraphQL thread nodes to domain ReviewThread objects with author classification. */
 export function mapGraphQLThreads(nodes: GQLThreadNode[]): ReviewThread[] {
   return nodes.map((node) => ({
+    id: node.id,
     path: node.path,
     startLine: node.startLine,
     line: node.line,
