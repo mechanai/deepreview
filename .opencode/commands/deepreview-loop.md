@@ -41,8 +41,8 @@ Run the full deepreview pipeline (Stages 1-5 from the deepreview command):
 
 - Determine SESSION_DIR=`$REPO_ROOT/.ai/deepreview/loop-iter$ITERATION-$(date +%Y-%m-%d-%H%M%S)` and write input.txt
 - Append SESSION_DIR to ALL_SESSION_DIRS
-- Stage 1: 6 parallel reviewers — prepend PRIOR_CONTEXT (if non-empty) to each reviewer's prompt as "${PRIOR_CONTEXT}You are reviewing ... Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-{perspective}.md."
-- Stage 2: 6 parallel validators (cross-validation)
+- Stage 1: 7 parallel reviewers — prepend PRIOR_CONTEXT (if non-empty) to each reviewer's prompt as "${PRIOR_CONTEXT}You are reviewing ... Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-{perspective}.md."
+- Stage 2: 7 parallel validators (cross-validation)
   - Note: validators do NOT receive PRIOR_CONTEXT. This is intentional — validators independently verify reviewer claims without being influenced by design context.
 - Stage 3: Synthesizer
 - Stage 4: Implementation planner
@@ -163,7 +163,7 @@ Set PRIOR_CONTEXT to the returned text. Validate that it contains "## Prior Find
 
 STEP 5c: RUN REVIEW WITH CROSS-VALIDATION
 
-Stage 1 — DISPATCH 6 PARALLEL REVIEWERS:
+Stage 1 — DISPATCH 7 PARALLEL REVIEWERS:
 Each reviewer prompt MUST include PRIOR_CONTEXT and the novelty-seeking framing below.
 
 The REVIEWER_PREAMBLE for all iter2+ reviewers is:
@@ -210,50 +210,58 @@ Task 6 — Use the Task tool with subagent_type="deepreview-performance":
 
 Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-performance.md."
 
-Wait for all 6. Record which succeeded.
+Task 7 — Use the Task tool with subagent_type="deepreview-maintainability":
+"$REVIEWER_PREAMBLE
+
+Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/review-maintainability.md."
+
+Wait for all 7. Record which succeeded.
 
 STEP 5d: VERIFY REVIEWER OUTPUT
 Check how many review files were actually written. Run: `ls $SESSION_DIR/review-*.md 2>/dev/null | wc -l`
 
 - If 0 files exist: Tell the user "All reviewers failed to produce output. This usually means the diff is too large for subagent context windows or there was an infrastructure failure." STOP.
-- If 1-2 files exist: Warn the user "Only N/6 reviewers produced output. Proceeding with partial results." Continue with what exists.
+- If 1-2 files exist: Warn the user "Only N/7 reviewers produced output. Proceeding with partial results." Continue with what exists.
 - If 3+ files exist: Proceed normally.
 
-Stage 2 — DISPATCH 6 PARALLEL VALIDATORS (cross-validation):
-Task 7 — Use the Task tool with subagent_type="deepreview-validator":
-"Your perspective: correctness. Read all review files at: $SESSION_DIR/review-correctness.md, $SESSION_DIR/review-security.md, $SESSION_DIR/review-architecture.md, $SESSION_DIR/review-docs.md, $SESSION_DIR/review-compatibility.md, $SESSION_DIR/review-performance.md. Also read the original input at $SESSION_DIR/input.txt for context. Write your validated review to $SESSION_DIR/validated-correctness.md."
-
+Stage 2 — DISPATCH 7 PARALLEL VALIDATORS (cross-validation):
 Task 8 — Use the Task tool with subagent_type="deepreview-validator":
-"Your perspective: security. Read all review files at: $SESSION_DIR/review-correctness.md, $SESSION_DIR/review-security.md, $SESSION_DIR/review-architecture.md, $SESSION_DIR/review-docs.md, $SESSION_DIR/review-compatibility.md, $SESSION_DIR/review-performance.md. Also read the original input at $SESSION_DIR/input.txt for context. Write your validated review to $SESSION_DIR/validated-security.md."
+"Your perspective: correctness. Read all review files at: $SESSION_DIR/review-correctness.md, $SESSION_DIR/review-security.md, $SESSION_DIR/review-architecture.md, $SESSION_DIR/review-docs.md, $SESSION_DIR/review-compatibility.md, $SESSION_DIR/review-performance.md, $SESSION_DIR/review-maintainability.md. Also read the original input at $SESSION_DIR/input.txt for context. Write your validated review to $SESSION_DIR/validated-correctness.md."
 
 Task 9 — Use the Task tool with subagent_type="deepreview-validator":
-"Your perspective: architecture. Read all review files at: $SESSION_DIR/review-correctness.md, $SESSION_DIR/review-security.md, $SESSION_DIR/review-architecture.md, $SESSION_DIR/review-docs.md, $SESSION_DIR/review-compatibility.md, $SESSION_DIR/review-performance.md. Also read the original input at $SESSION_DIR/input.txt for context. Write your validated review to $SESSION_DIR/validated-architecture.md."
+"Your perspective: security. Read all review files at: $SESSION_DIR/review-correctness.md, $SESSION_DIR/review-security.md, $SESSION_DIR/review-architecture.md, $SESSION_DIR/review-docs.md, $SESSION_DIR/review-compatibility.md, $SESSION_DIR/review-performance.md, $SESSION_DIR/review-maintainability.md. Also read the original input at $SESSION_DIR/input.txt for context. Write your validated review to $SESSION_DIR/validated-security.md."
 
 Task 10 — Use the Task tool with subagent_type="deepreview-validator":
-"Your perspective: docs. Read all review files at: $SESSION_DIR/review-correctness.md, $SESSION_DIR/review-security.md, $SESSION_DIR/review-architecture.md, $SESSION_DIR/review-docs.md, $SESSION_DIR/review-compatibility.md, $SESSION_DIR/review-performance.md. Also read the original input at $SESSION_DIR/input.txt for context. Write your validated review to $SESSION_DIR/validated-docs.md."
+"Your perspective: architecture. Read all review files at: $SESSION_DIR/review-correctness.md, $SESSION_DIR/review-security.md, $SESSION_DIR/review-architecture.md, $SESSION_DIR/review-docs.md, $SESSION_DIR/review-compatibility.md, $SESSION_DIR/review-performance.md, $SESSION_DIR/review-maintainability.md. Also read the original input at $SESSION_DIR/input.txt for context. Write your validated review to $SESSION_DIR/validated-architecture.md."
 
 Task 11 — Use the Task tool with subagent_type="deepreview-validator":
-"Your perspective: compatibility. Read all review files at: $SESSION_DIR/review-correctness.md, $SESSION_DIR/review-security.md, $SESSION_DIR/review-architecture.md, $SESSION_DIR/review-docs.md, $SESSION_DIR/review-compatibility.md, $SESSION_DIR/review-performance.md. Also read the original input at $SESSION_DIR/input.txt for context. Write your validated review to $SESSION_DIR/validated-compatibility.md."
+"Your perspective: docs. Read all review files at: $SESSION_DIR/review-correctness.md, $SESSION_DIR/review-security.md, $SESSION_DIR/review-architecture.md, $SESSION_DIR/review-docs.md, $SESSION_DIR/review-compatibility.md, $SESSION_DIR/review-performance.md, $SESSION_DIR/review-maintainability.md. Also read the original input at $SESSION_DIR/input.txt for context. Write your validated review to $SESSION_DIR/validated-docs.md."
 
 Task 12 — Use the Task tool with subagent_type="deepreview-validator":
-"Your perspective: performance. Read all review files at: $SESSION_DIR/review-correctness.md, $SESSION_DIR/review-security.md, $SESSION_DIR/review-architecture.md, $SESSION_DIR/review-docs.md, $SESSION_DIR/review-compatibility.md, $SESSION_DIR/review-performance.md. Also read the original input at $SESSION_DIR/input.txt for context. Write your validated review to $SESSION_DIR/validated-performance.md."
+"Your perspective: compatibility. Read all review files at: $SESSION_DIR/review-correctness.md, $SESSION_DIR/review-security.md, $SESSION_DIR/review-architecture.md, $SESSION_DIR/review-docs.md, $SESSION_DIR/review-compatibility.md, $SESSION_DIR/review-performance.md, $SESSION_DIR/review-maintainability.md. Also read the original input at $SESSION_DIR/input.txt for context. Write your validated review to $SESSION_DIR/validated-compatibility.md."
 
-Wait for all 6 to return.
+Task 13 — Use the Task tool with subagent_type="deepreview-validator":
+"Your perspective: performance. Read all review files at: $SESSION_DIR/review-correctness.md, $SESSION_DIR/review-security.md, $SESSION_DIR/review-architecture.md, $SESSION_DIR/review-docs.md, $SESSION_DIR/review-compatibility.md, $SESSION_DIR/review-performance.md, $SESSION_DIR/review-maintainability.md. Also read the original input at $SESSION_DIR/input.txt for context. Write your validated review to $SESSION_DIR/validated-performance.md."
+
+Task 14 — Use the Task tool with subagent_type="deepreview-validator":
+"Your perspective: maintainability. Read all review files at: $SESSION_DIR/review-correctness.md, $SESSION_DIR/review-security.md, $SESSION_DIR/review-architecture.md, $SESSION_DIR/review-docs.md, $SESSION_DIR/review-compatibility.md, $SESSION_DIR/review-performance.md, $SESSION_DIR/review-maintainability.md. Also read the original input at $SESSION_DIR/input.txt for context. Write your validated review to $SESSION_DIR/validated-maintainability.md."
+
+Wait for all 7 to return.
 
 Stage 3 — DISPATCH SYNTHESIZER:
-Task 13 — Use the Task tool with subagent_type="deepreview-synthesizer":
-"Read the validated reviews at: $SESSION_DIR/validated-correctness.md, $SESSION_DIR/validated-security.md, $SESSION_DIR/validated-architecture.md, $SESSION_DIR/validated-docs.md, $SESSION_DIR/validated-compatibility.md, $SESSION_DIR/validated-performance.md (skip any that don't exist). Write the synthesis to $SESSION_DIR/synthesis.md."
+Task 15 — Use the Task tool with subagent_type="deepreview-synthesizer":
+"Read the validated reviews at: $SESSION_DIR/validated-correctness.md, $SESSION_DIR/validated-security.md, $SESSION_DIR/validated-architecture.md, $SESSION_DIR/validated-docs.md, $SESSION_DIR/validated-compatibility.md, $SESSION_DIR/validated-performance.md, $SESSION_DIR/validated-maintainability.md (skip any that don't exist). Write the synthesis to $SESSION_DIR/synthesis.md."
 
 Record the stats line.
 
 Stage 4 — DISPATCH PLANNER:
-Task 14 — Use the Task tool with subagent_type="deepreview-planner":
+Task 16 — Use the Task tool with subagent_type="deepreview-planner":
 "Read the synthesis at $SESSION_DIR/synthesis.md. Write the implementation plan to $SESSION_DIR/implementation-plan.md."
 
 Record the summary line.
 
 Stage 5 — DISPATCH PLAN VALIDATOR:
-Task 15 — Use the Task tool with subagent_type="deepreview-plan-validator":
+Task 17 — Use the Task tool with subagent_type="deepreview-plan-validator":
 "Read the implementation plan at $SESSION_DIR/implementation-plan.md, the synthesis at $SESSION_DIR/synthesis.md, and the original input at $SESSION_DIR/input.txt. Write the validated plan to $SESSION_DIR/validated-plan.md."
 
 If this task fails, emit a warning: "Plan validation failed — applying unvalidated plan." and set PLAN_FILE="$SESSION_DIR/implementation-plan.md". Otherwise set PLAN_FILE="$SESSION_DIR/validated-plan.md" and record the stats line.
