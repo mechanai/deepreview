@@ -7,6 +7,7 @@ You are an orchestrator for a multi-agent code review pipeline. Follow these ste
 STEP 1: DETERMINE INPUT MODE AND SESSION DIRECTORY
 Classify "$ARGUMENTS":
 
+- If it starts with `--full`, extract FORCE_FULL=true and remove `--full` from $ARGUMENTS before parsing the rest. Otherwise set FORCE_FULL=false.
 - If it starts with `--context <path>`, extract CONTEXT_FILE=<path> and remove it from $ARGUMENTS before parsing the rest.
 - Validate CONTEXT_FILE: it must be a relative path (no leading `/`), must not contain `..`, must exist on disk, and must be a regular file (not a directory or symlink to outside the project), and must be under 50KB. If validation fails, tell the user the error and STOP.
 - If it is a number → MODE=pr
@@ -72,6 +73,45 @@ If CONTEXT_FILE exists, set DESIGN_CONTEXT to the contents of that file. Build a
 If CONTEXT_FILE does not exist and PROJECT_CONTEXT is not empty, set CONTEXT_PREAMBLE to just "${PROJECT_CONTEXT}\n"
 
 If both are empty, set CONTEXT_PREAMBLE="" (empty string).
+
+STEP 2c: CHECK DIFF SIZE AND ROUTE
+If FORCE_FULL is true: proceed to STEP 3 (full pipeline).
+
+If MODE is "files": proceed to STEP 3 (full pipeline). (File mode has no diff metrics to measure.)
+
+Otherwise (MODE is "pr" or "branch"):
+
+FILE_COUNT=$(grep -c '^diff --git' "$SESSION_DIR/input.txt")
+LINE_COUNT=$(grep '^[+-]' "$SESSION_DIR/input.txt" | grep -vc '^[+-][+-][+-]')
+
+If FILE_COUNT <= 8 AND LINE_COUNT <= 500:
+Tell the user: "Small diff detected ($FILE_COUNT files, $LINE_COUNT lines changed). Using abbreviated review. Use `--full` to force the full pipeline."
+Go to STEP 3-QUICK.
+
+Proceed to STEP 3 (full pipeline).
+
+STEP 3-QUICK: DISPATCH ABBREVIATED REVIEW (1 task)
+Task 1 — Use the Task tool with subagent_type="deepreview-quick-reviewer":
+"${CONTEXT_PREAMBLE}You are reviewing $INPUT_DESCRIPTION. Read the content at $SESSION_DIR/input.txt. Write your review to $SESSION_DIR/synthesis.md."
+
+Wait for it to return. Record the stats line.
+
+If this task fails (agent error or timeout): tell the user "Quick review failed." and STOP.
+If the stats line reports 0 critical, 0 warnings, 0 suggestions: tell the user "No issues found." and STOP.
+
+STEP 4-QUICK: DISPATCH IMPLEMENTATION PLAN (1 task)
+Task 2 — Use the Task tool with subagent_type="deepreview-planner":
+"Read the synthesis at $SESSION_DIR/synthesis.md. Write the implementation plan to $SESSION_DIR/implementation-plan.md."
+
+Record the summary line from its return.
+
+STEP 5-QUICK: DISPATCH PLAN VALIDATION (1 task)
+Task 3 — Use the Task tool with subagent_type="deepreview-plan-validator":
+"Read the implementation plan at $SESSION_DIR/implementation-plan.md, the synthesis at $SESSION_DIR/synthesis.md, and the original input at $SESSION_DIR/input.txt. Write the validated plan to $SESSION_DIR/validated-plan.md."
+
+If this task fails, emit a warning: "Plan validation failed — applying unvalidated plan." and set PLAN_FILE="$SESSION_DIR/implementation-plan.md". Otherwise set PLAN_FILE="$SESSION_DIR/validated-plan.md" and record the stats line.
+
+Go to STEP 8 (PRESENT RESULTS).
 
 STEP 3: DISPATCH STAGE 1 — INITIAL REVIEW (7 parallel tasks)
 Dispatch ALL SEVEN of these Task tool calls simultaneously in a single message:
@@ -147,6 +187,7 @@ STEP 8: PRESENT RESULTS
 Show the user:
 
 - Session directory: $SESSION_DIR/
+- Pipeline: abbreviated (single-pass) or full (7 reviewers + cross-validation)
 - Which reviewers completed (and any that failed)
 - Stats from synthesis (the stats line from Step 5)
 - Summary from planner (the summary line from Step 6)
