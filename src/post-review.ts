@@ -1,8 +1,5 @@
-import { readFile, realpath } from "node:fs/promises";
-import { resolve } from "node:path";
-import { parseThreads } from "./parse-threads.ts";
-import { type Finding, type ClassifiedFinding } from "./diff-classifier.ts";
-import { type PrInfo, getPrInfo, execFileAsync } from "./graphql.ts";
+import { type ClassifiedFinding } from "./diff-classifier.ts";
+import { type PrInfo, execFileAsync } from "./graphql.ts";
 import {
   type PendingReview,
   findPendingReview,
@@ -11,9 +8,9 @@ import {
   addLineThread,
   addFileThread,
   updateReviewComment,
+  replyToThread,
 } from "./review-api.ts";
 import {
-  isValidPath,
   isRateLimitError,
   findingId,
   embedFindingId,
@@ -21,6 +18,7 @@ import {
   buildReviewBody,
   classifyAndLog,
 } from "./review-helpers.ts";
+import { loadAndValidatePr } from "./load-pr.ts";
 
 export interface PostReviewOptions {
   threadsPath: string;
@@ -146,7 +144,6 @@ async function postInlineThreads(
     const results = await Promise.all(
       batch.map(async (f) => {
         const id = findingId(f.path, f.startLine, f.line, f.body);
-        // Body rendered by GitHub's Markdown sanitizer; no escaping needed here
         const body = embedFindingId(f.renderedBody ?? f.body, id);
         const ok = await postWithRetry(reviewId, f, body);
         return ok ? null : id;
@@ -157,6 +154,40 @@ async function postInlineThreads(
     }
   }
   return failedFindings;
+}
+
+async function postReplyThreads(
+  replyFindings: ClassifiedFinding[],
+  reviewId: string,
+): Promise<string[]> {
+  const CONCURRENCY = 2;
+  const failedIds: string[] = [];
+
+  for (let i = 0; i < replyFindings.length; i += CONCURRENCY) {
+    if (i > 0) await Bun.sleep(1000);
+    const batch = replyFindings.slice(i, i + CONCURRENCY);
+    const results = await Promise.all(
+      batch.map(async (f) => {
+        const id = findingId(f.path, f.startLine, f.line, f.body);
+        const body = embedFindingId(f.renderedBody ?? f.body, id);
+        try {
+          await replyToThread(f.replyTo!, body);
+          return null;
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : String(err);
+          console.warn(
+            `WARN: Reply to thread ${f.replyTo} failed (${message}). Falling back to new thread.`,
+          );
+          const ok = await postWithRetry(reviewId, f, body);
+          return ok ? null : id;
+        }
+      }),
+    );
+    for (const id of results) {
+      if (id !== null) failedIds.push(id);
+    }
+  }
+  return failedIds;
 }
 
 async function ensureReview(
@@ -188,44 +219,6 @@ async function ensureReview(
   return { reviewId, updatedFindings: new Set() };
 }
 
-async function loadAndValidatePr(
-  threadsPath: string,
-  prNumber: number,
-  expectedSha: string | undefined,
-  cwd: string | undefined,
-): Promise<{ findings: Finding[]; prInfo: PrInfo; summary?: string } | null> {
-  if (!isValidPath(threadsPath)) {
-    throw new Error(`Invalid threadsPath: ${threadsPath}`);
-  }
-  // cwd is a trusted parameter set by the plugin framework (not user-supplied)
-  const base = await realpath(resolve(cwd ?? process.cwd()));
-  const candidatePath = resolve(base, threadsPath);
-  let resolved: string;
-  try {
-    resolved = await realpath(candidatePath);
-  } catch {
-    throw new Error(`Threads file not found: ${candidatePath}`);
-  }
-  if (!resolved.startsWith(base + "/") && resolved !== base) {
-    throw new Error(`threadsPath escapes working directory: ${threadsPath}`);
-  }
-  const content = await readFile(resolved, "utf8");
-  const { findings, summary } = parseThreads(content);
-  if (findings.length === 0 && (summary === undefined || summary === "")) return null;
-
-  const prInfo = await getPrInfo(prNumber, { cwd });
-  if (prInfo.state !== "OPEN") {
-    throw new Error(`PR is ${prInfo.state}. Aborting.`);
-  }
-
-  const resolvedSha = expectedSha ?? process.env.PR_HEAD_SHA;
-  if (resolvedSha !== undefined && resolvedSha !== "" && resolvedSha !== prInfo.headOid) {
-    throw new Error(`ABORT: PR head moved (expected ${resolvedSha}, got ${prInfo.headOid}).`);
-  }
-
-  return { findings, prInfo, summary };
-}
-
 async function postFindings(
   tier1: ClassifiedFinding[],
   tier2: ClassifiedFinding[],
@@ -247,26 +240,32 @@ async function postFindings(
   );
 
   const skipSet = new Set(skipIds);
-  const inlineFindings = [...tier1, ...tier2].filter((f) => {
+  const allInline = [...tier1, ...tier2].filter((f) => {
     const id = findingId(f.path, f.startLine, f.line, f.body);
     return !skipSet.has(id);
   });
 
-  const failedIds = await postInlineThreads(reviewId, inlineFindings, updatedFindings);
-  const skipped = inlineFindings.filter((f) =>
+  // Split into reply findings and new findings
+  const replyFindings = allInline.filter((f) => f.replyTo !== undefined);
+  const newFindings = allInline.filter((f) => f.replyTo === undefined);
+
+  const replyFailedIds = await postReplyThreads(replyFindings, reviewId);
+  const newFailedIds = await postInlineThreads(reviewId, newFindings, updatedFindings);
+
+  const failedIds = [...replyFailedIds, ...newFailedIds];
+  const skipped = newFindings.filter((f) =>
     updatedFindings.has(findingId(f.path, f.startLine, f.line, f.body)),
   ).length;
-  const pending = inlineFindings.length - skipped;
-  const truncatedCount = Math.max(0, pending - MAX_INLINE_FINDINGS);
-  const posted = Math.min(pending, MAX_INLINE_FINDINGS) - failedIds.length;
+  const pendingNew = newFindings.length - skipped;
+  const postedNew = Math.min(pendingNew, MAX_INLINE_FINDINGS) - newFailedIds.length;
+  const postedReplies = replyFindings.length - replyFailedIds.length;
   const totalFindings = [...tier1, ...tier2].length;
-  const skippedByUser = totalFindings - inlineFindings.length;
+  const truncated = Math.max(0, pendingNew - MAX_INLINE_FINDINGS);
   const statusSummary =
-    `Posted ${posted}/${totalFindings} inline threads (${skipped} up-to-date, ${skippedByUser} skipped, ${failedIds.length} failed${truncatedCount > 0 ? `, ${truncatedCount} truncated` : ""}). ` +
-    `${tier3.length} findings in review body.`;
+    `Posted ${postedNew + postedReplies}/${totalFindings} inline threads` +
+    ` (${postedReplies} replies, ${skipped} up-to-date, ${totalFindings - allInline.length} skipped, ${failedIds.length} failed${truncated > 0 ? `, ${truncated} truncated` : ""}). ${tier3.length} findings in review body.`;
 
   console.log(statusSummary);
-
   return { summary: statusSummary, failed: failedIds };
 }
 

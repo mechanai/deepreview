@@ -33,6 +33,33 @@ describe("buildReviewBody", () => {
   });
 });
 
+describe("postReview reply routing", () => {
+  it("classifies findings with replyTo separately from new findings", () => {
+    const threadsContent = [
+      "---",
+      "path: src/foo.ts",
+      "line: 10",
+      "replyTo: PRT_kwDOABC123",
+      "---",
+      "Reply body here.",
+      "---",
+      "path: src/bar.ts",
+      "line: 20",
+      "---",
+      "New finding body.",
+    ].join("\n");
+
+    const { findings } = parseThreads(threadsContent);
+    const replyFindings = findings.filter((f) => f.replyTo !== undefined);
+    const newFindings = findings.filter((f) => f.replyTo === undefined);
+
+    assert.equal(replyFindings.length, 1);
+    assert.equal(replyFindings[0].replyTo, "PRT_kwDOABC123");
+    assert.equal(newFindings.length, 1);
+    assert.equal(newFindings[0].path, "src/bar.ts");
+  });
+});
+
 describe("integration: parse → classify", () => {
   const threadsContent = [
     "---",
