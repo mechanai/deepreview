@@ -1,12 +1,33 @@
 import { type Plugin, type PluginInput, tool } from "@opencode-ai/plugin";
+import { execSync } from "node:child_process";
+import { resolve } from "node:path";
 import { postReview } from "../../src/post-review.ts";
 import { buildPriorReview } from "../../src/build-prior-review.ts";
 import {
+  type CalibrationEntry,
+  type CalibrationSettings,
   loadCalibration,
   formatCalibrationPreamble,
   writeCalibration,
 } from "../../src/calibration.ts";
-import type { CalibrationEntry, CalibrationSettings } from "../../src/calibration.ts";
+
+/**
+ * Resolve the main repository root (not a worktree root) from a working directory.
+ * Falls back to the given directory if git resolution fails.
+ */
+function resolveRepoRoot(cwd: string): string {
+  try {
+    const gitCommonDir = execSync("git rev-parse --git-common-dir", {
+      cwd,
+      encoding: "utf-8",
+    }).trim();
+    // git-common-dir returns the path to .git (or the shared .git dir for worktrees).
+    // It may be relative, so resolve against cwd, then strip trailing /.git for the repo root.
+    return resolve(cwd, gitCommonDir).replace(/\/\.git$/u, "");
+  } catch {
+    return cwd;
+  }
+}
 
 // oxlint-disable-next-line require-await, max-lines-per-function -- Why: Plugin type signature requires async but this plugin has no async initialization; function is long due to tool registrations with schema definitions
 export const server: Plugin = async (_input: PluginInput) => {
@@ -82,7 +103,7 @@ export const server: Plugin = async (_input: PluginInput) => {
           "and a formatted preamble for reviewer injection.",
         args: {},
         async execute(_args, context) {
-          const repoRoot = context.directory;
+          const repoRoot = resolveRepoRoot(context.directory);
           const { active, expired } = loadCalibration(repoRoot);
           const preamble = formatCalibrationPreamble(active);
           return JSON.stringify({ active, expired, preamble });
@@ -102,7 +123,7 @@ export const server: Plugin = async (_input: PluginInput) => {
             .describe("Expiry window in days (default: 30)"),
         },
         async execute(args, context) {
-          const repoRoot = context.directory;
+          const repoRoot = resolveRepoRoot(context.directory);
           // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Why: JSON.parse returns any; schema is validated by the caller (orchestrator)
           const entries = JSON.parse(args.entries) as CalibrationEntry[];
           const settings: CalibrationSettings = { expiryDays: args.expiry_days ?? 30 };
