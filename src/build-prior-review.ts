@@ -55,7 +55,8 @@ function formatThread(thread: ReviewThread): string {
   const lines: string[] = [];
   const lineRef = formatLineRef(thread.startLine, thread.line);
   const tag = formatSourceTag(first, thread);
-  lines.push(`- ${lineRef} ${tag}: ${formatCommentBody(first.body, "  ")}`);
+  const threadTag = `[thread: ${thread.id}]`;
+  lines.push(`- ${lineRef} ${tag} ${threadTag}: ${formatCommentBody(first.body, "  ")}`);
   for (const reply of replies) {
     lines.push(`  - @${reply.authorLogin} replied: ${formatCommentBody(reply.body, "    ")}`);
   }

@@ -562,6 +562,24 @@ describe("formatPriorReview: formatSourceTag paths", () => {
   });
 });
 
+describe("formatPriorReview: thread ID tags", () => {
+  it("includes thread ID tag in formatted output", () => {
+    const thread = makeThread("src/foo.ts", 10, [{ login: "alice", body: "Fix this" }], {
+      id: "PRT_kwDOABC123",
+    });
+    const result = formatPriorReview("", [thread], null);
+    assert.ok(result.includes("[thread: PRT_kwDOABC123]"));
+  });
+
+  it("places thread ID after source tag", () => {
+    const thread = makeThread("src/foo.ts", 10, [{ login: "alice", body: "Fix this" }], {
+      id: "PRT_kwDOXYZ789",
+    });
+    const result = formatPriorReview("", [thread], null);
+    assert.match(result, /\[source: [^\]]+\] \[thread: PRT_kwDOXYZ789\]/u);
+  });
+});
+
 describe("formatPriorReview: formatThread empty comments", () => {
   it("returns empty output for thread with no comments", () => {
     const threads: ReviewThread[] = [
