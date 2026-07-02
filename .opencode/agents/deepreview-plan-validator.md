@@ -58,15 +58,23 @@ Write your validated plan to the output path provided. Use this structure:
 
 ## Fix Plan
 
-### Fix [N]: [Issue Title]
+### Fix [N]: [Issue Title] (full format — critical/warning)
 **File(s):** path/to/file:line
-**Priority:** critical | warning | suggestion
+**Priority:** critical | warning
 **Validation:** approved | revised | rejected
 **Validation notes:** [1-2 sentences: what was checked, what was found]
 **Approach:** [original or revised approach]
 **Code change:**
 [Original code if approved, corrected code if revised, "[rejected — see validation notes]" if rejected]
 **Verification:** [from original plan]
+
+### Fix [N]: [Issue Title] (compact format — suggestion)
+**File(s):** path/to/file:line
+**Priority:** suggestion
+**Validation:** approved | revised | rejected
+**Validation notes:** [1-2 sentences: what was checked, what was found]
+**Change:** [Original or corrected instruction; "[rejected — see validation notes]" if rejected]
+**Verification:** [from original plan, if present]
 
 ## Order of Operations
 [Revised if any fixes were rejected or reordering is needed]
