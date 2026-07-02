@@ -12,6 +12,7 @@ STEP 1: DETERMINE INPUT
 - Set FILES="$ARGUMENTS"
 - Set ITERATION=1
 - Set PRIOR_CONTEXT="" (empty — built up across iterations; holds both design context and prior findings)
+- Set CONSECUTIVE_ZERO_NEW=0 (tracks consecutive iterations with 0 new findings for deadlock detection)
 - Set ALL_SESSION_DIRS=[] (list of all session directories used, in order)
 - Determine REPO_ROOT — the main repository root (not a worktree root). Run:
   `REPO_ROOT=$(realpath "$(git rev-parse --git-common-dir)" | sed 's|/\.git$||')`
@@ -47,6 +48,47 @@ Run the full deepreview-spec pipeline (Stages 1-5 from the deepreview-spec comma
 Record the stats from the synthesis return: count of critical, warning, and suggestion findings.
 
 STEP 3: CHECK EXIT CONDITIONS
+
+Parse the stats line from the synthesizer. If it contains novelty metrics (the `| N new, N recurring, N regression` suffix), use NOVELTY MODE. Otherwise use LEGACY MODE.
+
+NOVELTY MODE (iter2+ only):
+
+A) CLEAN EXIT: If 0 critical AND 0 warning AND 0 suggestion:
+
+- Tell the user: "deepreview-spec-loop complete after $ITERATION iteration(s). No findings remain."
+- STOP.
+
+B) CONVERGENCE EXIT: If `0 new AND 0 regression`:
+
+- Tell the user: "deepreview-spec-loop converged after $ITERATION iteration(s). No new findings detected. Remaining recurring findings (if any) reflect reviewer opinion differences."
+- STOP.
+
+C) DEADLOCK EXIT: If `0 new AND N recurring (N > 0) AND 0 regression` for 2 consecutive iterations:
+
+- Tell the user: "Deadlock detected: $N recurring findings persist with no new issues found across 2 iterations:"
+- List the recurring findings.
+- Ask: "How would you like to resolve these? Options: skip these findings, provide guidance, or stop the loop."
+- Follow the user's instruction.
+
+D) DIVERGENCE CHECK (iter2+ only): If total findings INCREASE from the previous iteration:
+
+- If all additional findings are classified [RECURRING] (none are [NEW]):
+  Treat as deadlock, not divergence. Tell the user: "Apparent divergence is actually recurring findings being re-reported. Treating as deadlock."
+  Trigger deadlock prompt (same as C).
+- Otherwise (genuinely new findings increasing):
+  Tell the user: "Divergence detected: findings increased from N to M. The review is not converging — fixes are introducing new issues or reviewers are finding new stylistic concerns."
+  Show the iteration-over-iteration stats.
+  Ask: "Accept current state, revert last iteration's changes, or continue with only critical/warning fixes (ignore suggestions)?"
+  Follow the user's instruction.
+
+E) Otherwise: proceed to STEP 4.
+
+Tracking: If `0 new`, increment CONSECUTIVE_ZERO_NEW. If `> 0 new`, reset CONSECUTIVE_ZERO_NEW to 0. Deadlock (C) triggers when CONSECUTIVE_ZERO_NEW >= 2 AND recurring > 0.
+
+LEGACY MODE (fallback when synthesizer omits novelty metrics):
+
+Warn the user: "Synthesizer did not return novelty metrics — falling back to legacy convergence detection."
+
 Track the total finding count (critical + warning + suggestion) for each iteration in a list: HISTORY.
 
 A) CLEAN EXIT: If 0 critical AND 0 warning AND 0 suggestion:
@@ -54,11 +96,11 @@ A) CLEAN EXIT: If 0 critical AND 0 warning AND 0 suggestion:
 - Tell the user: "deepreview-spec-loop complete after $ITERATION iteration(s). No findings remain."
 - STOP.
 
-B) PLATEAU EXIT: If ITERATION >= 3 and the total has not decreased compared to the minimum of any previous iteration for 2 consecutive iterations (i.e., the last 2 totals are both >= the historical minimum):
+B) PLATEAU EXIT: If ITERATION >= 3 and the total has not decreased compared to the minimum of any previous iteration for 2 consecutive iterations:
 
-- Tell the user: "deepreview-spec-loop plateau after $ITERATION iteration(s). Findings are oscillating (history: [list totals]) and not converging. The spec has been substantively improved but remaining findings likely reflect reviewer opinion differences."
-- Show the latest stats breakdown (critical/warning/suggestion).
-- STOP. Do NOT ask to continue — plateaus in spec review are a natural stopping point.
+- Tell the user: "deepreview-spec-loop plateau after $ITERATION iteration(s). Findings are oscillating (history: [list totals]) and not converging."
+- Show the latest stats breakdown.
+- STOP.
 
 STEP 4: APPLY ALL FIXES
 Dispatch the applier automatically — do NOT ask the user for permission.
@@ -74,7 +116,7 @@ Set ITERATION = ITERATION + 1
 
 If ITERATION > 7:
 
-- Tell the user: "deepreview-spec-loop hit iteration limit (7). This should not normally happen — plateau detection should have stopped earlier."
+- Tell the user: "deepreview-spec-loop hit iteration limit (7). This should not normally happen — convergence or deadlock detection should have stopped earlier."
 - Show the latest stats.
 - STOP.
 
@@ -177,8 +219,20 @@ Note: Validators intentionally do NOT receive PRIOR_CONTEXT. They filter on obje
 Wait for all 5.
 
 Stage 3 — DISPATCH SYNTHESIZER:
+Extract PRIOR_FINDINGS_SECTION from PRIOR_CONTEXT: include only the "## Prior Findings" and "## Applied Fixes" sections (not "Known Issue Locations" or "Covered Regions" — those are for reviewers only).
+
+If PRIOR_FINDINGS_SECTION is non-empty, include the novelty classification header in the synthesizer prompt. If empty (helper returned malformed context), omit the header — the synthesizer will operate in standard mode and the orchestrator MUST use LEGACY MODE for this iteration's exit check.
+
 Task 11 — Use the Task tool with subagent_type="deepreview-synthesizer":
-"Read the validated reviews at: $SESSION_DIR/validated-completeness.md, $SESSION_DIR/validated-consistency.md, $SESSION_DIR/validated-feasibility.md, $SESSION_DIR/validated-docs.md, $SESSION_DIR/validated-architecture.md. Write the synthesis to $SESSION_DIR/synthesis.md."
+
+- If PRIOR_FINDINGS_SECTION is non-empty:
+  "## Prior Findings for Novelty Classification
+  $PRIOR_FINDINGS_SECTION
+
+  Read the validated reviews at: $SESSION_DIR/validated-completeness.md, $SESSION_DIR/validated-consistency.md, $SESSION_DIR/validated-feasibility.md, $SESSION_DIR/validated-docs.md, $SESSION_DIR/validated-architecture.md (skip any that don't exist). Write the synthesis to $SESSION_DIR/synthesis.md."
+
+- If PRIOR_FINDINGS_SECTION is empty:
+  "Read the validated reviews at: $SESSION_DIR/validated-completeness.md, $SESSION_DIR/validated-consistency.md, $SESSION_DIR/validated-feasibility.md, $SESSION_DIR/validated-docs.md, $SESSION_DIR/validated-architecture.md (skip any that don't exist). Write the synthesis to $SESSION_DIR/synthesis.md."
 
 Record the stats line.
 
@@ -195,23 +249,6 @@ Task 13 — Use the Task tool with subagent_type="deepreview-plan-validator":
 If this task fails, emit a warning: "Plan validation failed — applying unvalidated plan." and set PLAN_FILE="$SESSION_DIR/implementation-plan.md". Otherwise set PLAN_FILE="$SESSION_DIR/validated-plan.md" and record the stats line.
 
 Go to STEP 3.
-
-STEP 6: DIVERGENCE AND DEADLOCK DETECTION
-Track finding counts across iterations. Detect TWO failure modes:
-
-A) DIVERGENCE: If total findings INCREASE from one iteration to the next:
-
-- Tell the user: "Divergence detected: findings increased from N to M. The review is not converging — fixes are introducing new issues or reviewers are finding new stylistic concerns."
-- Show the iteration-over-iteration stats.
-- Ask: "Accept current state, revert last iteration's changes, or continue with only critical/warning fixes (ignore suggestions)?"
-- Follow the user's instruction.
-
-B) DEADLOCK: If two consecutive iterations produce the same findings (same location, same issue title):
-
-- Tell the user: "Deadlock detected: the following findings persist across iterations:"
-- List the repeated findings.
-- Ask: "How would you like to resolve these? Options: skip these findings, provide guidance, or stop the loop."
-- Follow the user's instruction.
 
 IMPORTANT RULES:
 

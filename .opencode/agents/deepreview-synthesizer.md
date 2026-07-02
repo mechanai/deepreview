@@ -21,6 +21,25 @@ If your prompt begins with a "Prior Findings" preamble, reviewers were instructe
 - **New findings only**: Your synthesis should contain only genuinely new findings. Do not re-synthesize issues from the prior review preamble.
 - **Regression detection**: If a reviewer flags something in a region that was previously fixed (per the preamble), treat it as a potential regression and flag it at warning severity or higher.
 
+## Novelty classification (iter2+ loop context only)
+
+If your prompt includes a "## Prior Findings for Novelty Classification" preamble, classify each
+finding in the current iteration:
+
+- **[NEW]**: mechanism not present in any prior finding (different file + different mechanism, or same file but genuinely different issue)
+- **[RECURRING]**: same file + same mechanism as a prior finding (even if reworded or at a slightly different line)
+- **[REGRESSION]**: found in code/spec modified by a previous iteration's applied fix AND the mechanism is directly related to the change made by the fix
+
+Classification process (after deduplication, before ranking):
+
+1. Check "Applied Fixes" — if the finding is in a region modified by a fix AND the mechanism is directly related to the change, classify as [REGRESSION].
+2. Check prior findings — if a finding matches an existing mechanism (same file + similar problem, even if differently worded), classify as [RECURRING].
+3. Everything else is [NEW].
+
+Prefix each finding entry with its classification tag: `[NEW]`, `[RECURRING]`, or `[REGRESSION]`.
+
+If no "Prior Findings for Novelty Classification" preamble is present, skip classification entirely — do not emit tags or the Iteration Metrics section.
+
 ## Process
 
 1. Read all validated review files
@@ -50,6 +69,12 @@ Write your synthesis to the output path provided. Use this structure:
 ## Overall Assessment
 [2-3 sentences: is this safe to merge, what is the biggest concern, overall quality]
 
+## Iteration Metrics
+Iteration N: X findings (Y new, Z recurring, W regression)
+- Convergence: [converging|deadlocked|diverging]
+
+[Omit this section entirely if no novelty classification was performed (iter1 or single-pass)]
+
 ## Critical Issues (must fix before merge)
 [All critical severity items, deduplicated and ranked by confidence]
 
@@ -74,6 +99,17 @@ The following doc/comment updates were identified (suggestion-level):
 
 Be concise. No preamble or filler.
 
+Convergence value for the Iteration Metrics section:
+
+- `converging`: 0 new findings, or fewer new findings than the prior iteration
+- `deadlocked`: 0 new findings but recurring findings persist
+- `diverging`: more new findings than the prior iteration
+
 ## Response contract
 
-After writing your synthesis file, your ONLY response must be the absolute path to your output file and a single stats line (e.g., "3 critical, 5 warnings, 2 suggestions"). Do not summarize findings. Do not include any other text.
+After writing your synthesis file, your ONLY response must be the absolute path to your output file and a single stats line. Format:
+
+- Without novelty classification: `"3 critical, 5 warnings, 2 suggestions"`
+- With novelty classification: `"3 critical, 5 warnings, 2 suggestions | 4 new, 5 recurring, 1 regression"`
+
+Do not summarize findings. Do not include any other text.
