@@ -85,39 +85,53 @@ async function postThread(
   }
 }
 
+const RATE_LIMIT_DELAY_MS = 60_000;
+const RATE_LIMIT_JITTER_MS = 10_000;
+const MAX_RATE_LIMIT_RETRIES = 2;
+
+/** Retry an async operation with rate-limit-aware backoff. Returns true on success. */
+async function withRateLimitRetry(
+  fn: () => Promise<void>,
+  label: string,
+  maxRetries: number = MAX_RATE_LIMIT_RETRIES,
+): Promise<boolean> {
+  try {
+    await fn();
+    return true;
+  } catch (err: unknown) {
+    if (!isRateLimitError(err)) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`FAIL: ${label} — ${message}`);
+      return false;
+    }
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      console.warn(`Rate limited on ${label}. Waiting 60s (retry ${attempt + 1}/${maxRetries})...`);
+      await Bun.sleep(RATE_LIMIT_DELAY_MS + Math.floor(Math.random() * RATE_LIMIT_JITTER_MS));
+      try {
+        await fn();
+        return true;
+      } catch (retryErr: unknown) {
+        if (!isRateLimitError(retryErr)) {
+          const message = retryErr instanceof Error ? retryErr.message : String(retryErr);
+          console.error(`FAIL: ${label} — ${message}`);
+          return false;
+        }
+      }
+    }
+    console.error(`FAIL: ${label} — rate limited after retries`);
+    return false;
+  }
+}
+
 async function postWithRetry(
   reviewId: string,
   finding: ClassifiedFinding,
   body: string,
 ): Promise<boolean> {
-  try {
-    await postThread(reviewId, finding, body);
-    return true;
-  } catch (err: unknown) {
-    if (!isRateLimitError(err)) {
-      const message = err instanceof Error ? err.message : String(err);
-      console.error(`FAIL: ${finding.path}:${finding.line} — ${message}`);
-      return false;
-    }
-    for (let attempt = 0; attempt < 2; attempt++) {
-      console.warn(
-        `Rate limited on ${finding.path}:${finding.line}. Waiting 60s (retry ${attempt + 1}/2)...`,
-      );
-      await Bun.sleep(60_000 + Math.floor(Math.random() * 10_000));
-      try {
-        await postThread(reviewId, finding, body);
-        return true;
-      } catch (retryErr: unknown) {
-        if (!isRateLimitError(retryErr)) {
-          const message = retryErr instanceof Error ? retryErr.message : String(retryErr);
-          console.error(`FAIL: ${finding.path}:${finding.line} — ${message}`);
-          return false;
-        }
-      }
-    }
-    console.error(`FAIL: ${finding.path}:${finding.line} — rate limited after retries`);
-    return false;
-  }
+  return withRateLimitRetry(
+    async () => postThread(reviewId, finding, body),
+    `${finding.path}:${finding.line}`,
+  );
 }
 
 async function postInlineThreads(
@@ -156,23 +170,6 @@ async function postInlineThreads(
   return failedFindings;
 }
 
-async function tryReplyWithRetry(finding: ClassifiedFinding, body: string): Promise<boolean> {
-  try {
-    await replyToThread(finding.replyTo!, body);
-    return true;
-  } catch (err: unknown) {
-    if (!isRateLimitError(err)) return false;
-    console.warn(`Rate limited on reply to ${finding.replyTo}. Waiting 60s...`);
-    await Bun.sleep(60_000 + Math.floor(Math.random() * 10_000));
-    try {
-      await replyToThread(finding.replyTo!, body);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-}
-
 async function postReplyThreads(
   replyFindings: ClassifiedFinding[],
   reviewId: string,
@@ -187,9 +184,13 @@ async function postReplyThreads(
       batch.map(async (f) => {
         const id = findingId(f.path, f.startLine, f.line, f.body);
         const body = embedFindingId(f.renderedBody ?? f.body, id);
-        const replied = await tryReplyWithRetry(f, body);
+        const threadId = f.replyTo!;
+        const replied = await withRateLimitRetry(
+          async () => replyToThread(threadId, body),
+          `reply to ${threadId}`,
+        );
         if (replied) return null;
-        console.warn(`WARN: Reply to thread ${f.replyTo} failed. Falling back to new thread.`);
+        console.warn(`WARN: Reply to thread ${threadId} failed. Falling back to new thread.`);
         const ok = await postWithRetry(reviewId, f, body);
         return ok ? null : id;
       }),
