@@ -174,6 +174,23 @@ async function postReplyThreads(
           await replyToThread(f.replyTo!, body);
           return null;
         } catch (err: unknown) {
+          if (isRateLimitError(err)) {
+            console.warn(`Rate limited on reply to ${f.replyTo}. Waiting 60s...`);
+            await Bun.sleep(60_000 + Math.floor(Math.random() * 10_000));
+            try {
+              await replyToThread(f.replyTo!, body);
+              return null;
+            } catch (retryErr: unknown) {
+              if (!isRateLimitError(retryErr)) {
+                const message = retryErr instanceof Error ? retryErr.message : String(retryErr);
+                console.warn(
+                  `WARN: Reply to thread ${f.replyTo} failed after retry (${message}). Falling back to new thread.`,
+                );
+                const ok = await postWithRetry(reviewId, f, body);
+                return ok ? null : id;
+              }
+            }
+          }
           const message = err instanceof Error ? err.message : String(err);
           console.warn(
             `WARN: Reply to thread ${f.replyTo} failed (${message}). Falling back to new thread.`,
@@ -246,7 +263,11 @@ async function postFindings(
   });
 
   // Split into reply findings and new findings
-  const replyFindings = allInline.filter((f) => f.replyTo !== undefined);
+  const replyFindings = allInline.filter(
+    (f) =>
+      f.replyTo !== undefined &&
+      !updatedFindings.has(findingId(f.path, f.startLine, f.line, f.body)),
+  );
   const newFindings = allInline.filter((f) => f.replyTo === undefined);
 
   const replyFailedIds = await postReplyThreads(replyFindings, reviewId);
