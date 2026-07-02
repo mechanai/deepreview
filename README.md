@@ -1,6 +1,6 @@
 # deepreview
 
-Multi-agent parallel code/spec review for [OpenCode](https://opencode.ai). Spawns 6 specialized
+Multi-agent parallel code/spec review for [OpenCode](https://opencode.ai). Spawns 7 specialized
 review agents, cross-validates findings, synthesizes results, and produces an actionable
 implementation plan.
 
@@ -36,6 +36,10 @@ This will:
 /deepreview 123               # Review PR #123
 /deepreview file1.ts file2.ts # Review specific files
 /deepreview --context decisions.md   # Review with design context (suppresses known decisions)
+/deepreview --full            # Force the full pipeline (skip auto-detection)
+
+/deepreview-quick             # Abbreviated review (single-pass, 3 subagents)
+/deepreview-quick 123         # Abbreviated review of PR #123
 
 /deepreview-loop              # Review + fix loop (repeats until clean or 5 iterations)
 /deepreview-loop 123          # Same, targeting a PR
@@ -55,13 +59,24 @@ All commands accept a branch diff, PR number, or file path(s). The `-loop` varia
 apply fixes automatically and re-review until no findings remain. Pauses on plateaus
 (same finding persists across iterations).
 
+For small diffs (<=8 files, <=500 lines), `/deepreview` automatically uses the abbreviated
+path (single-pass reviewer, ~80% fewer tokens). Use `--full` to override.
+
 ## Pipeline
 
 ```mermaid
 graph LR
-    A[6 Reviewers] --> B[6 Validators]
+    A[7 Reviewers] --> B[7 Validators]
     B --> C[Synthesizer]
     C --> D[Planner]
+    D --> E[Applier]
+```
+
+For small diffs, the abbreviated path collapses this to:
+
+```mermaid
+graph LR
+    A[Quick Reviewer] --> D[Planner]
     D --> E[Applier]
 ```
 
@@ -75,6 +90,7 @@ its own context, keeping token usage minimal.
 | correctness / completeness  | Logic bugs, edge cases, error handling | Gaps, missing edge cases, undefined behavior |
 | security / consistency      | Vulnerabilities, threat vectors        | Contradictions, name mismatches, type drift  |
 | architecture                | Patterns, coupling, complexity         | Patterns, coupling, complexity               |
+| maintainability / —         | Naming, nesting, dead code, style      | —                                            |
 | docs                        | Comment quality, stale claims          | Comment quality, stale claims                |
 | compatibility / feasibility | Breaking changes, API contracts        | Implicit dependencies, can it be built       |
 | performance / —             | N+1 queries, leaks, hot paths          | —                                            |
