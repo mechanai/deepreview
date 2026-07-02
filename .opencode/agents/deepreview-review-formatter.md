@@ -24,6 +24,21 @@ Read all provided files.
 
 When `prior-review.md` is provided, emit findings from **both** the synthesis and the prior review, but deduplicate: if a prior-review finding and a synthesis finding refer to the same file path and line (or overlapping line range) AND describe the same issue, keep only the synthesis version (it may have updated wording). When in doubt, keep both — false duplicates are worse than a missing dedup.
 
+## Replying to existing threads
+
+When a finding overlaps with an existing thread from the prior review (identified by its `[thread: ID]` tag), decide:
+
+1. Does your finding add substantive value beyond what the thread already says?
+   - A concrete suggestion block the thread lacks: reply
+   - Additional analysis or a related issue the original missed: reply
+   - Just restating what's already there: omit the finding entirely
+
+2. If replying, use `replyTo: <thread ID>` in the frontmatter instead of `startLine`. The body should be written as a reply — it appears below existing comments in the thread. Don't repeat context the reader can see above.
+
+3. If the thread is marked `[resolved]` or `[outdated]` in the prior review, do NOT reply to it. Post as a new finding instead (or omit if redundant).
+
+4. `replyTo` and `startLine` are mutually exclusive. When using `replyTo`, omit `startLine`.
+
 ## Prior-review-only mode
 
 This mode activates when the orchestrator provides `prior-review.md` but no `synthesis.md` (synthesis failed or was skipped). In this mode:
@@ -72,6 +87,17 @@ startLine: <start line, omit if single-line>
 line: <line number>
 ---
 <markdown body of the comment>
+```
+
+If replying to an existing thread:
+
+```
+---
+path: <file path>
+line: <line number>
+replyTo: <thread ID from prior review>
+---
+<markdown body of the reply>
 ```
 
 ## Content rules
