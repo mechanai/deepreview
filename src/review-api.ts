@@ -260,6 +260,7 @@ export async function updateReviewComment(commentId: string, body: string): Prom
   );
 }
 
+/** Post a reply comment on an existing review thread. */
 export async function replyToThread(threadId: string, body: string): Promise<void> {
   await graphql(
     `

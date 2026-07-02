@@ -5,6 +5,7 @@ import { type Finding } from "./diff-classifier.ts";
 import { type PrInfo, getPrInfo } from "./graphql.ts";
 import { isValidPath } from "./review-helpers.ts";
 
+/** Load and parse a threads file, validate the PR is open, and verify the head SHA matches. */
 export async function loadAndValidatePr(
   threadsPath: string,
   prNumber: number,
