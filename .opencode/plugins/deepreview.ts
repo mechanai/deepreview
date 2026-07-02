@@ -1,6 +1,12 @@
 import { type Plugin, type PluginInput, tool } from "@opencode-ai/plugin";
 import { postReview } from "../../src/post-review.ts";
 import { buildPriorReview } from "../../src/build-prior-review.ts";
+import {
+  loadCalibration,
+  formatCalibrationPreamble,
+  writeCalibration,
+} from "../../src/calibration.ts";
+import type { CalibrationEntry, CalibrationSettings } from "../../src/calibration.ts";
 
 // oxlint-disable-next-line require-await, max-lines-per-function -- Why: Plugin type signature requires async but this plugin has no async initialization; function is long due to tool registrations with schema definitions
 export const server: Plugin = async (_input: PluginInput) => {
@@ -67,6 +73,41 @@ export const server: Plugin = async (_input: PluginInput) => {
           } catch (err) {
             throw err instanceof Error ? err : new Error(String(err));
           }
+        },
+      }),
+      "deepreview-calibration-load": tool({
+        description:
+          "Load per-project calibration entries (learned severity adjustments from prior " +
+          "review sessions). Returns active entries, expired entries needing re-confirmation, " +
+          "and a formatted preamble for reviewer injection.",
+        args: {},
+        async execute(_args, context) {
+          const repoRoot = context.directory;
+          const { active, expired } = loadCalibration(repoRoot);
+          const preamble = formatCalibrationPreamble(active);
+          return JSON.stringify({ active, expired, preamble });
+        },
+      }),
+      "deepreview-calibration-save": tool({
+        description:
+          "Save calibration entries to .ai/deepreview/calibration.yml (local, unversioned). " +
+          "Always writes to local — never modifies .deepreview.yml.",
+        args: {
+          entries: tool.schema.string().describe("JSON array of CalibrationEntry objects to save"),
+          expiry_days: tool.schema
+            .number()
+            .int()
+            .positive()
+            .optional()
+            .describe("Expiry window in days (default: 30)"),
+        },
+        async execute(args, context) {
+          const repoRoot = context.directory;
+          // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Why: JSON.parse returns any; schema is validated by the caller (orchestrator)
+          const entries = JSON.parse(args.entries) as CalibrationEntry[];
+          const settings: CalibrationSettings = { expiryDays: args.expiry_days ?? 30 };
+          writeCalibration(repoRoot, { version: 1, settings, entries });
+          return JSON.stringify({ written: `${repoRoot}/.ai/deepreview/calibration.yml` });
         },
       }),
     },
