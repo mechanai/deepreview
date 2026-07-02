@@ -1,7 +1,7 @@
 import { describe, it } from "bun:test";
 import assert from "node:assert/strict";
 import { parseThreads } from "./parse-threads.ts";
-import { classifyFindings } from "./diff-classifier.ts";
+import { classifyFindings, type ReplyFinding } from "./diff-classifier.ts";
 import { buildReviewBody } from "./review-helpers.ts";
 
 describe("buildReviewBody", () => {
@@ -131,5 +131,35 @@ describe("integration: parse → classify", () => {
     assert.equal(classified[1].tier, 2);
     // pkg/other.go not in diff → tier 3
     assert.equal(classified[2].tier, 3);
+  });
+});
+
+describe("ReplyFinding type narrowing", () => {
+  it("filter produces ReplyFinding[] when checking replyTo", () => {
+    const { findings } = parseThreads(
+      [
+        "---",
+        "path: src/foo.ts",
+        "line: 10",
+        "replyTo: PRT_kwDOABC123",
+        "---",
+        "Reply body.",
+        "---",
+        "path: src/bar.ts",
+        "line: 20",
+        "---",
+        "New body.",
+      ].join("\n"),
+    );
+
+    const replies: ReplyFinding[] = findings
+      .filter((f): f is ReplyFinding => f.replyTo !== undefined)
+      .map((f) => ({ ...f, tier: 1 as const }));
+
+    assert.equal(replies.length, 1);
+    assert.equal(replies[0].replyTo, "PRT_kwDOABC123");
+    // Type check: replyTo is string (not string | undefined)
+    const threadId: string = replies[0].replyTo;
+    assert.equal(threadId, "PRT_kwDOABC123");
   });
 });
