@@ -1,8 +1,8 @@
 # deepreview
 
 Multi-agent parallel code/spec review for [OpenCode](https://opencode.ai). Spawns 7 specialized
-review agents, cross-validates findings, synthesizes results, and produces an actionable
-implementation plan.
+review agents, cross-validates findings, synthesizes results, and produces a
+plan-validated, actionable implementation plan.
 
 ## Install
 
@@ -66,18 +66,44 @@ path (single-pass reviewer, ~80% fewer tokens). Use `--full` to override.
 
 ```mermaid
 graph LR
-    A[7 Reviewers] --> B[7 Validators]
-    B --> C[Synthesizer]
-    C --> D[Planner]
-    D --> E[Applier]
+    subgraph reviewers["Stage 1 — Reviewers (parallel)"]
+        direction TB
+        R1[correctness]
+        R2[security]
+        R3[architecture]
+        R4[docs]
+        R5[compatibility]
+        R6[performance]
+        R7[maintainability]
+    end
+
+    subgraph validators["Stage 2 — Validators (parallel)"]
+        direction TB
+        V1[correctness]
+        V2[security]
+        V3[architecture]
+        V4[docs]
+        V5[compatibility]
+        V6[performance]
+        V7[maintainability]
+    end
+
+    reviewers --> validators
+    validators --> S[Synthesizer]
+    S --> P[Planner]
+    P --> PV[Plan-Validator]
+    PV --> A[Applier]
 ```
 
-For small diffs, the abbreviated path collapses this to:
+Every validator reads all seven reviews (not just the matching one) to cross-check
+claims from its assigned perspective. For small diffs, the abbreviated path collapses
+Stages 1–2 into a single reviewer:
 
 ```mermaid
 graph LR
-    A[Quick Reviewer] --> D[Planner]
-    D --> E[Applier]
+    QR[Quick Reviewer] --> P[Planner]
+    P --> PV[Plan-Validator]
+    PV --> A[Applier]
 ```
 
 Stages communicate via files on disk — the orchestrator never reads review content into
