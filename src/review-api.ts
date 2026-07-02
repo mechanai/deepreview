@@ -259,3 +259,18 @@ export async function updateReviewComment(commentId: string, body: string): Prom
     { input: { pullRequestReviewCommentId: commentId, body } },
   );
 }
+
+export async function replyToThread(threadId: string, body: string): Promise<void> {
+  await graphql(
+    `
+      mutation ($input: AddPullRequestReviewThreadReplyInput!) {
+        addPullRequestReviewThreadReply(input: $input) {
+          comment {
+            id
+          }
+        }
+      }
+    `,
+    { input: { pullRequestReviewThreadId: threadId, body } },
+  );
+}
