@@ -83,6 +83,65 @@ graph LR
 Stages communicate via files on disk — the orchestrator never reads review content into
 its own context, keeping token usage minimal.
 
+## Calibration
+
+deepreview learns from validator severity adjustments over time. When validators
+consistently downgrade the same category of finding (e.g., "missing auth" in a
+localhost-only tool), the system proposes calibration entries at the end of each
+review session.
+
+### How it works
+
+1. **Session end:** The orchestrator compares reviewer severity to synthesized
+   (post-validation) severity
+2. **Proposal:** Systematic downgrades are proposed as calibration entries
+3. **User confirms:** You approve, edit, or reject the proposed changes
+4. **Next session:** Approved calibration is injected into reviewer prompts,
+   reducing severity inflation
+
+### Configuration
+
+Local calibration (personal, gitignored):
+
+```yaml
+# .ai/deepreview/calibration.yml
+version: 1
+settings:
+  expiryDays: 30 # days before unconfirmed entries expire
+entries:
+  - id: "cal-001"
+    pattern: "missing authentication"
+    context: "localhost-only server"
+    originalSeverity: "warning"
+    adjustedSeverity: "suggestion"
+    observedCount: 4
+    lastConfirmed: "2026-06-28"
+    createdAt: "2026-06-01"
+```
+
+### Sharing calibration with your team
+
+To share calibration entries, add them to `.deepreview.yml` under the `calibration:` key:
+
+```yaml
+# .deepreview.yml
+threatModel: localhost-only
+calibration:
+  settings:
+    expiryDays: 60
+  entries:
+    - id: "shared-001"
+      pattern: "missing authentication"
+      context: "localhost-only server"
+      originalSeverity: "warning"
+      adjustedSeverity: "suggestion"
+      observedCount: 4
+      lastConfirmed: "2026-06-28"
+      createdAt: "2026-06-01"
+```
+
+Local entries override shared entries when both match the same `pattern` + `context`.
+
 ### Review agents
 
 | Agent                       | Code review                            | Spec review                                  |

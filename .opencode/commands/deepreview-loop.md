@@ -18,6 +18,7 @@ Set ITERATION=1
 Set PRIOR_CONTEXT="" (empty — built up across iterations; holds both design context and prior findings)
 Set CONSECUTIVE_ZERO_NEW=0 (tracks consecutive iterations with 0 new findings for deadlock detection)
 Set ALL_SESSION_DIRS=[] (list of all session directories used, in order)
+Set EXPIRED_ENTRIES=[] (calibration entries that have expired — collected at start, used at end)
 
 Determine REPO_ROOT — the main repository root (not a worktree root). Run:
 `REPO_ROOT=$(realpath "$(git rev-parse --git-common-dir)" | sed 's|/\.git$||')`
@@ -29,6 +30,12 @@ Extract PROJECT_CONTEXT by detecting project metadata (version, deployment model
 - If no .deepreview.yml exists, infer deployment model: v0.x.0 and private packages are "internal-network", v1+.x.x and public are "public-facing", otherwise "unknown"
 - Format as a calibration preamble with version info, deployment model, and guidance for severity adjustment
 - If metadata extraction fails or no version info is found, set PROJECT_CONTEXT="" (empty string)
+
+Load learned calibration by calling the `deepreview-calibration-load` tool (no arguments needed — it uses the working directory). Parse the JSON response:
+
+- If `preamble` is non-empty, append it to PROJECT_CONTEXT (after the static calibration guidelines)
+- If `expired` is non-empty, store EXPIRED_ENTRIES for end-of-session prompting
+- If the tool fails or returns empty, proceed without calibration (do not STOP)
 
 Build PRIOR_CONTEXT:
 
@@ -62,7 +69,7 @@ NOVELTY MODE (iter2+ only):
 A) CONVERGENCE EXIT: If `0 new AND 0 regression`:
 
 - Tell the user: "deepreview-loop converged after $ITERATION iteration(s). No new findings detected."
-- STOP.
+- Go to STEP 6 (calibration proposal), then STOP.
 
 B) DEADLOCK (synthesizer signal): If `0 new AND N recurring (N > 0) AND 0 regression` for 2 consecutive iterations:
 
@@ -95,7 +102,7 @@ Compare this iteration's findings (file:line + issue title) against the previous
 If the synthesis/review has 0 critical AND 0 warning AND 0 suggestion findings:
 
 - Tell the user: "deepreview-loop complete after $ITERATION iteration(s). No findings remain."
-- STOP.
+- Go to STEP 6 (calibration proposal), then STOP.
 
 STEP 4: APPLY ALL FIXES
 Dispatch the applier automatically — do NOT ask the user for permission.
@@ -130,7 +137,7 @@ If ITERATION > 5:
 - Tell the user: "deepreviewloop hit iteration limit (5). Remaining findings may require manual intervention or a design decision."
 - Show the latest stats.
 - Ask the user: "Continue for more iterations, or stop here?"
-- If user says stop → STOP.
+- If user says stop → Go to STEP 6 (calibration proposal), then STOP.
 - If user says continue → reset limit to ITERATION + 5 and proceed.
 
 Create new session directory: SESSION_DIR="$REPO_ROOT/.ai/deepreview/loop-iter$ITERATION-$(date +%Y-%m-%d-%H%M%S)"
@@ -309,10 +316,48 @@ If this task fails, emit a warning: "Plan validation failed — applying unvalid
 
 Go to STEP 3.
 
+STEP 6: PROPOSE CALIBRATION UPDATES (runs after any exit — clean exit, deadlock, or iteration limit)
+
+Skip this step if ITERATION == 1 AND the exit was a clean exit (0 findings on first pass means nothing to calibrate).
+
+Compare reviewer severity to synthesized severity from the LAST completed iteration:
+
+1. Read the reviewer files ($SESSION_DIR/review-\*.md) from the last iteration
+2. Read the synthesis file ($SESSION_DIR/synthesis.md) from the last iteration
+3. For each finding in the synthesis, identify if ANY reviewer originally flagged it at a HIGHER severity
+4. Only consider DOWNGRADES (reviewer said "critical" or "warning", synthesis says lower)
+
+For each detected downgrade pattern:
+
+- Check if it matches an existing calibration entry (from EXPIRED_ENTRIES or active entries loaded at start)
+  - If yes: increment observedCount, set lastConfirmed to today
+  - If new: create a proposed entry with observedCount=1
+
+If there are proposed updates (new or incremented entries) OR expired entries to remove:
+
+- Call `deepreview-calibration-load` to get current entries
+- Present to user:
+
+```
+Calibration update proposed:
+
+- NEW: "[pattern]" in [context]: [originalSeverity] → [adjustedSeverity]
+- UPDATED: "[pattern]" in [context]: observed N→N+1, re-confirmed
+- EXPIRED: "[pattern]" (last confirmed N days ago) — will be removed
+
+Accept these changes? [y/n/edit]
+```
+
+- If user approves: merge proposed entries with existing active entries (removing expired ones), then call `deepreview-calibration-save` with the merged entries
+- If user says "edit": let them modify the proposal, then save
+- If user rejects: skip saving
+
+If no adjustments were detected and no entries expired, skip this step silently.
+
 IMPORTANT RULES:
 
-- Do NOT read any review/synthesis/plan files yourself. Ever.
-- Use ONLY the file paths and stats/summary lines returned by subagents.
+- Do NOT read any review/synthesis/plan files yourself during STEPS 1-5. Exception: STEP 6 (calibration proposal) requires reading reviewer and synthesis files to detect severity adjustments.
+- Use ONLY the file paths and stats/summary lines returned by subagents (during STEPS 1-5).
 - Apply ALL findings (critical, warning, AND suggestion) — the goal is a clean review.
 - Do NOT ask the user for permission to apply fixes. Apply automatically.
 - DO ask the user if: iteration limit is hit, deadlock is detected, verification fails, or diff size diverges.
