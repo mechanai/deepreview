@@ -15,6 +15,7 @@ export interface ThreadComment {
 
 /** A review thread attached to a file path and line range. */
 export interface ReviewThread {
+  id: string;
   path: string;
   startLine: number | null;
   line: number | null;
@@ -54,7 +55,8 @@ function formatThread(thread: ReviewThread): string {
   const lines: string[] = [];
   const lineRef = formatLineRef(thread.startLine, thread.line);
   const tag = formatSourceTag(first, thread);
-  lines.push(`- ${lineRef} ${tag}: ${formatCommentBody(first.body, "  ")}`);
+  const threadTag = `[thread: ${thread.id}]`;
+  lines.push(`- ${lineRef} ${tag} ${threadTag}: ${formatCommentBody(first.body, "  ")}`);
   for (const reply of replies) {
     lines.push(`  - @${reply.authorLogin} replied: ${formatCommentBody(reply.body, "    ")}`);
   }

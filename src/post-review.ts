@@ -1,8 +1,5 @@
-import { readFile, realpath } from "node:fs/promises";
-import { resolve } from "node:path";
-import { parseThreads } from "./parse-threads.ts";
-import { type Finding, type ClassifiedFinding } from "./diff-classifier.ts";
-import { type PrInfo, getPrInfo, execFileAsync } from "./graphql.ts";
+import { type ClassifiedFinding, type ReplyFinding } from "./diff-classifier.ts";
+import { type PrInfo, execFileAsync } from "./graphql.ts";
 import {
   type PendingReview,
   findPendingReview,
@@ -11,16 +8,17 @@ import {
   addLineThread,
   addFileThread,
   updateReviewComment,
+  replyToThread,
 } from "./review-api.ts";
 import {
-  isValidPath,
-  isRateLimitError,
   findingId,
   embedFindingId,
   extractFindingId,
   buildReviewBody,
   classifyAndLog,
 } from "./review-helpers.ts";
+import { mapBatch, withRateLimitRetry } from "./batch-retry.ts";
+import { loadAndValidatePr } from "./load-pr.ts";
 
 export interface PostReviewOptions {
   threadsPath: string;
@@ -59,17 +57,10 @@ async function updateExistingThreads(
     }
   }
 
-  const CONCURRENCY = 2;
-  for (let i = 0; i < toUpdate.length; i += CONCURRENCY) {
-    if (i > 0) await Bun.sleep(1000);
-    const batch = toUpdate.slice(i, i + CONCURRENCY);
-    await Promise.all(
-      batch.map(async ({ finding, commentId, id }) => {
-        const body = embedFindingId(finding.renderedBody ?? finding.body, id);
-        await updateReviewComment(commentId, body);
-      }),
-    );
-  }
+  await mapBatch(toUpdate, async ({ finding, commentId, id }) => {
+    const body = embedFindingId(finding.renderedBody ?? finding.body, id);
+    await updateReviewComment(commentId, body);
+  });
 
   console.log(`Updated ${toUpdate.length} existing threads.`);
   return new Set(toUpdate.map(({ id }) => id));
@@ -92,71 +83,65 @@ async function postWithRetry(
   finding: ClassifiedFinding,
   body: string,
 ): Promise<boolean> {
-  try {
-    await postThread(reviewId, finding, body);
-    return true;
-  } catch (err: unknown) {
-    if (!isRateLimitError(err)) {
-      const message = err instanceof Error ? err.message : String(err);
-      console.error(`FAIL: ${finding.path}:${finding.line} — ${message}`);
-      return false;
-    }
-    for (let attempt = 0; attempt < 2; attempt++) {
-      console.warn(
-        `Rate limited on ${finding.path}:${finding.line}. Waiting 60s (retry ${attempt + 1}/2)...`,
-      );
-      await Bun.sleep(60_000 + Math.floor(Math.random() * 10_000));
-      try {
-        await postThread(reviewId, finding, body);
-        return true;
-      } catch (retryErr: unknown) {
-        if (!isRateLimitError(retryErr)) {
-          const message = retryErr instanceof Error ? retryErr.message : String(retryErr);
-          console.error(`FAIL: ${finding.path}:${finding.line} — ${message}`);
-          return false;
-        }
-      }
-    }
-    console.error(`FAIL: ${finding.path}:${finding.line} — rate limited after retries`);
-    return false;
-  }
+  return withRateLimitRetry(
+    async () => postThread(reviewId, finding, body),
+    `${finding.path}:${finding.line}`,
+  );
 }
 
 async function postInlineThreads(
   reviewId: string,
   inlineFindings: ClassifiedFinding[],
   updatedIds: Set<string>,
+  maxThreads: number = MAX_INLINE_FINDINGS,
 ): Promise<string[]> {
-  const CONCURRENCY = 2;
-  const failedFindings: string[] = [];
   const pending = inlineFindings.filter(
     (f) => !updatedIds.has(findingId(f.path, f.startLine, f.line, f.body)),
   );
 
-  if (pending.length > MAX_INLINE_FINDINGS) {
+  if (pending.length > maxThreads) {
     console.warn(
-      `WARN: ${pending.length} inline findings exceed limit of ${MAX_INLINE_FINDINGS}. Truncating.`,
+      `WARN: ${pending.length} inline findings exceed limit of ${maxThreads}. Truncating.`,
     );
   }
-  const capped = pending.slice(0, MAX_INLINE_FINDINGS);
+  const capped = pending.slice(0, maxThreads);
 
-  for (let i = 0; i < capped.length; i += CONCURRENCY) {
-    if (i > 0) await Bun.sleep(1000);
-    const batch = capped.slice(i, i + CONCURRENCY);
-    const results = await Promise.all(
-      batch.map(async (f) => {
-        const id = findingId(f.path, f.startLine, f.line, f.body);
-        // Body rendered by GitHub's Markdown sanitizer; no escaping needed here
-        const body = embedFindingId(f.renderedBody ?? f.body, id);
-        const ok = await postWithRetry(reviewId, f, body);
-        return ok ? null : id;
-      }),
+  const results = await mapBatch(capped, async (f) => {
+    const id = findingId(f.path, f.startLine, f.line, f.body);
+    const body = embedFindingId(f.renderedBody ?? f.body, id);
+    const ok = await postWithRetry(reviewId, f, body);
+    return ok ? null : id;
+  });
+  return results.filter((id): id is string => id !== null);
+}
+
+async function postReplyThreads(
+  replyFindings: ReplyFinding[],
+  reviewId: string,
+  inlineBudgetRemaining: number,
+): Promise<{ failedIds: string[]; fallbackCount: number }> {
+  let fallbackCount = 0;
+  const results = await mapBatch(replyFindings, async (f) => {
+    const id = findingId(f.path, f.startLine, f.line, f.body);
+    const body = embedFindingId(f.renderedBody ?? f.body, id);
+    const replied = await withRateLimitRetry(
+      async () => replyToThread(f.replyTo, body),
+      `reply to ${f.replyTo}`,
     );
-    for (const id of results) {
-      if (id !== null) failedFindings.push(id);
+    if (replied) return null;
+    // Fallback: post as new thread, subject to inline cap
+    if (fallbackCount >= inlineBudgetRemaining) {
+      console.warn(
+        `WARN: Reply to thread ${f.replyTo} failed. Inline cap reached — skipping fallback.`,
+      );
+      return id;
     }
-  }
-  return failedFindings;
+    console.warn(`WARN: Reply to thread ${f.replyTo} failed. Falling back to new thread.`);
+    fallbackCount++;
+    const ok = await postWithRetry(reviewId, f, body);
+    return ok ? null : id;
+  });
+  return { failedIds: results.filter((id): id is string => id !== null), fallbackCount };
 }
 
 async function ensureReview(
@@ -188,44 +173,32 @@ async function ensureReview(
   return { reviewId, updatedFindings: new Set() };
 }
 
-async function loadAndValidatePr(
-  threadsPath: string,
-  prNumber: number,
-  expectedSha: string | undefined,
-  cwd: string | undefined,
-): Promise<{ findings: Finding[]; prInfo: PrInfo; summary?: string } | null> {
-  if (!isValidPath(threadsPath)) {
-    throw new Error(`Invalid threadsPath: ${threadsPath}`);
-  }
-  // cwd is a trusted parameter set by the plugin framework (not user-supplied)
-  const base = await realpath(resolve(cwd ?? process.cwd()));
-  const candidatePath = resolve(base, threadsPath);
-  let resolved: string;
-  try {
-    resolved = await realpath(candidatePath);
-  } catch {
-    throw new Error(`Threads file not found: ${candidatePath}`);
-  }
-  if (!resolved.startsWith(base + "/") && resolved !== base) {
-    throw new Error(`threadsPath escapes working directory: ${threadsPath}`);
-  }
-  const content = await readFile(resolved, "utf8");
-  const { findings, summary } = parseThreads(content);
-  if (findings.length === 0 && (summary === undefined || summary === "")) return null;
-
-  const prInfo = await getPrInfo(prNumber, { cwd });
-  if (prInfo.state !== "OPEN") {
-    throw new Error(`PR is ${prInfo.state}. Aborting.`);
-  }
-
-  const resolvedSha = expectedSha ?? process.env.PR_HEAD_SHA;
-  if (resolvedSha !== undefined && resolvedSha !== "" && resolvedSha !== prInfo.headOid) {
-    throw new Error(`ABORT: PR head moved (expected ${resolvedSha}, got ${prInfo.headOid}).`);
-  }
-
-  return { findings, prInfo, summary };
+interface StatusCounts {
+  posted: number;
+  total: number;
+  replies: number;
+  upToDate: number;
+  skipped: number;
+  failed: number;
+  truncated: number;
+  tier3Count: number;
 }
 
+function formatStatusSummary(counts: StatusCounts): string {
+  const parts: string[] = [];
+  if (counts.replies > 0) parts.push(`${counts.replies} replies`);
+  if (counts.upToDate > 0) parts.push(`${counts.upToDate} up-to-date`);
+  if (counts.skipped > 0) parts.push(`${counts.skipped} skipped`);
+  if (counts.failed > 0) parts.push(`${counts.failed} failed`);
+  if (counts.truncated > 0) parts.push(`${counts.truncated} truncated`);
+  const detail = parts.length > 0 ? ` (${parts.join(", ")})` : "";
+  return (
+    `Posted ${counts.posted}/${counts.total} inline threads${detail}. ` +
+    `${counts.tier3Count} findings in review body.`
+  );
+}
+
+// oxlint-disable-next-line max-lines-per-function -- Why: orchestration function that coordinates reply/new posting and computes stats; splitting further would fragment the logic
 async function postFindings(
   tier1: ClassifiedFinding[],
   tier2: ClassifiedFinding[],
@@ -247,26 +220,57 @@ async function postFindings(
   );
 
   const skipSet = new Set(skipIds);
-  const inlineFindings = [...tier1, ...tier2].filter((f) => {
+  const allInline = [...tier1, ...tier2].filter((f) => {
     const id = findingId(f.path, f.startLine, f.line, f.body);
     return !skipSet.has(id);
   });
 
-  const failedIds = await postInlineThreads(reviewId, inlineFindings, updatedFindings);
-  const skipped = inlineFindings.filter((f) =>
+  // Split into reply findings and new findings
+  const replyFindings = allInline.filter(
+    (f): f is ReplyFinding =>
+      f.replyTo !== undefined &&
+      !updatedFindings.has(findingId(f.path, f.startLine, f.line, f.body)),
+  );
+  const newFindings = allInline.filter((f) => f.replyTo === undefined);
+
+  // Post replies first (fallbacks count against inline cap)
+  const inlineBudget = MAX_INLINE_FINDINGS;
+  const { failedIds: replyFailedIds, fallbackCount } = await postReplyThreads(
+    replyFindings,
+    reviewId,
+    inlineBudget,
+  );
+
+  // Post new threads with remaining budget after reply fallbacks
+  const newFailedIds = await postInlineThreads(
+    reviewId,
+    newFindings,
+    updatedFindings,
+    inlineBudget - fallbackCount,
+  );
+
+  const failedIds = [...replyFailedIds, ...newFailedIds];
+  const skipped = newFindings.filter((f) =>
     updatedFindings.has(findingId(f.path, f.startLine, f.line, f.body)),
   ).length;
-  const pending = inlineFindings.length - skipped;
-  const truncatedCount = Math.max(0, pending - MAX_INLINE_FINDINGS);
-  const posted = Math.min(pending, MAX_INLINE_FINDINGS) - failedIds.length;
+  const pendingNew = newFindings.length - skipped;
+  const postedNew = Math.min(pendingNew, inlineBudget - fallbackCount) - newFailedIds.length;
+  const postedReplies = replyFindings.length - replyFailedIds.length;
   const totalFindings = [...tier1, ...tier2].length;
-  const skippedByUser = totalFindings - inlineFindings.length;
-  const statusSummary =
-    `Posted ${posted}/${totalFindings} inline threads (${skipped} up-to-date, ${skippedByUser} skipped, ${failedIds.length} failed${truncatedCount > 0 ? `, ${truncatedCount} truncated` : ""}). ` +
-    `${tier3.length} findings in review body.`;
+  const truncated = Math.max(0, pendingNew - (inlineBudget - fallbackCount));
+
+  const statusSummary = formatStatusSummary({
+    posted: postedNew + postedReplies,
+    total: totalFindings,
+    replies: postedReplies,
+    upToDate: skipped,
+    skipped: totalFindings - allInline.length,
+    failed: failedIds.length,
+    truncated,
+    tier3Count: tier3.length,
+  });
 
   console.log(statusSummary);
-
   return { summary: statusSummary, failed: failedIds };
 }
 
@@ -291,8 +295,15 @@ export async function postReview(opts: PostReviewOptions): Promise<PostReviewRes
   const { tier1, tier2, tier3 } = classifyAndLog(findings, diff);
 
   if (dryRun) {
+    const replyCount = findings.filter((f) => f.replyTo !== undefined).length;
+    const parts = [
+      `${tier1.length} line-level`,
+      `${tier2.length} file-level`,
+      `${tier3.length} review-body`,
+    ];
+    if (replyCount > 0) parts.push(`${replyCount} replies`);
     return {
-      summary: `Dry run: ${tier1.length} line-level, ${tier2.length} file-level, ${tier3.length} review-body findings.`,
+      summary: `Dry run: ${parts.join(", ")} findings.`,
       failed: [],
     };
   }

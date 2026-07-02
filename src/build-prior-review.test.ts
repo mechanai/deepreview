@@ -14,9 +14,10 @@ function makeThread(
   path: string,
   line: number,
   comments: { login: string; body: string }[],
-  opts?: { startLine?: number; isResolved?: boolean; isOutdated?: boolean },
+  opts?: { id?: string; startLine?: number; isResolved?: boolean; isOutdated?: boolean },
 ): ReviewThread {
   return {
+    id: opts?.id ?? `PRT_${path}_${line}`,
     path,
     startLine: opts?.startLine ?? null,
     line,
@@ -54,10 +55,12 @@ describe("formatPriorReview: sections", () => {
   });
 });
 
+// oxlint-disable-next-line max-lines-per-function -- Why: two inline thread fixtures with full comment arrays are required to test multi-thread grouping and line-range formatting; extracting them would obscure the test intent
 describe("formatPriorReview: thread formatting", () => {
   it("formats threads grouped by file with line numbers", () => {
     const threads: ReviewThread[] = [
       {
+        id: "PRT_1",
         path: "src/foo.ts",
         startLine: 10,
         line: 15,
@@ -79,6 +82,7 @@ describe("formatPriorReview: thread formatting", () => {
         ],
       },
       {
+        id: "PRT_2",
         path: "src/foo.ts",
         startLine: null,
         line: 42,
@@ -248,6 +252,31 @@ describe("mapGraphQLThreads", () => {
     assert.equal(result[0].comments[0].authorType, "bot");
   });
 
+  it("preserves thread id from GraphQL node", () => {
+    const nodes = [
+      {
+        id: "PRT_kwDOABC123",
+        path: "src/foo.ts",
+        startLine: null,
+        line: 10,
+        isResolved: false,
+        isOutdated: false,
+        comments: {
+          pageInfo: { hasNextPage: false, endCursor: null },
+          nodes: [
+            {
+              author: { login: "alice", __typename: "User" },
+              body: "Fix this",
+              createdAt: "2026-01-01T00:00:00Z",
+            },
+          ],
+        },
+      },
+    ];
+    const result = mapGraphQLThreads(nodes);
+    assert.equal(result[0].id, "PRT_kwDOABC123");
+  });
+
   it("detects deepreview by finding ID HTML comment in body", () => {
     const nodes = [
       {
@@ -279,6 +308,7 @@ describe("buildPriorReviewContent: basic behavior", () => {
   it("keeps all content when under budget", () => {
     const threads: ReviewThread[] = [
       {
+        id: "PRT_basic",
         path: "a.ts",
         startLine: null,
         line: 1,
@@ -316,6 +346,7 @@ describe("buildPriorReview (integration shape)", () => {
 describe("buildPriorReviewContent: truncation", () => {
   it("drops oldest threads first when over budget", () => {
     const oldThread: ReviewThread = {
+      id: "PRT_old",
       path: "old.ts",
       startLine: null,
       line: 1,
@@ -331,6 +362,7 @@ describe("buildPriorReviewContent: truncation", () => {
       ],
     };
     const newThread: ReviewThread = {
+      id: "PRT_new",
       path: "new.ts",
       startLine: null,
       line: 1,
@@ -354,6 +386,7 @@ describe("buildPriorReviewContent: truncation", () => {
 
   it("preserves PR description and manual content even when threads are large", () => {
     const bigThread: ReviewThread = {
+      id: "PRT_big",
       path: "big.ts",
       startLine: null,
       line: 1,
@@ -383,6 +416,7 @@ describe("formatPriorReview: formatCommentBody paths", () => {
   it("renders multi-line body as indented blockquote", () => {
     const threads: ReviewThread[] = [
       {
+        id: "PRT_multi",
         path: "src/multi.ts",
         startLine: null,
         line: 1,
@@ -409,6 +443,7 @@ describe("formatPriorReview: formatCommentBody paths", () => {
   it("renders single-line body in quotes", () => {
     const threads: ReviewThread[] = [
       {
+        id: "PRT_single",
         path: "src/single.ts",
         startLine: null,
         line: 1,
@@ -433,6 +468,7 @@ describe("formatPriorReview: formatLineRef paths", () => {
   it("renders startLine only when line is null", () => {
     const threads: ReviewThread[] = [
       {
+        id: "PRT_start_only",
         path: "src/start-only.ts",
         startLine: 42,
         line: null,
@@ -457,6 +493,7 @@ describe("formatPriorReview: formatLineRef paths", () => {
   it("renders file-level when both startLine and line are null", () => {
     const threads: ReviewThread[] = [
       {
+        id: "PRT_file_level",
         path: "src/file-level.ts",
         startLine: null,
         line: null,
@@ -481,6 +518,7 @@ describe("formatPriorReview: formatSourceTag paths", () => {
   it("renders deepreview author type in source tag", () => {
     const threads: ReviewThread[] = [
       {
+        id: "PRT_dr",
         path: "src/dr.ts",
         startLine: null,
         line: 5,
@@ -503,6 +541,7 @@ describe("formatPriorReview: formatSourceTag paths", () => {
   it("renders both resolved and outdated simultaneously", () => {
     const threads: ReviewThread[] = [
       {
+        id: "PRT_both",
         path: "src/both.ts",
         startLine: null,
         line: 10,
@@ -523,10 +562,29 @@ describe("formatPriorReview: formatSourceTag paths", () => {
   });
 });
 
+describe("formatPriorReview: thread ID tags", () => {
+  it("includes thread ID tag in formatted output", () => {
+    const thread = makeThread("src/foo.ts", 10, [{ login: "alice", body: "Fix this" }], {
+      id: "PRT_kwDOABC123",
+    });
+    const result = formatPriorReview("", [thread], null);
+    assert.ok(result.includes("[thread: PRT_kwDOABC123]"));
+  });
+
+  it("places thread ID after source tag", () => {
+    const thread = makeThread("src/foo.ts", 10, [{ login: "alice", body: "Fix this" }], {
+      id: "PRT_kwDOXYZ789",
+    });
+    const result = formatPriorReview("", [thread], null);
+    assert.match(result, /\[source: [^\]]+\] \[thread: PRT_kwDOXYZ789\]/u);
+  });
+});
+
 describe("formatPriorReview: formatThread empty comments", () => {
   it("returns empty output for thread with no comments", () => {
     const threads: ReviewThread[] = [
       {
+        id: "PRT_empty",
         path: "src/empty.ts",
         startLine: null,
         line: 1,
@@ -585,6 +643,7 @@ describe("buildPriorReviewContent: edge cases", () => {
     const hugeThreadBody = "z".repeat(40_000);
     const threads: ReviewThread[] = [
       {
+        id: "PRT_big1",
         path: "big1.ts",
         startLine: null,
         line: 1,
@@ -600,6 +659,7 @@ describe("buildPriorReviewContent: edge cases", () => {
         ],
       },
       {
+        id: "PRT_big2",
         path: "big2.ts",
         startLine: null,
         line: 1,
