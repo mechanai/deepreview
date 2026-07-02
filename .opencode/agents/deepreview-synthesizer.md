@@ -99,10 +99,11 @@ The following doc/comment updates were identified (suggestion-level):
 
 Be concise. No preamble or filler.
 
-Convergence assessment rules:
-- `converging`: 0 new findings, or fewer new findings than the prior iteration reported
+Convergence value for the Iteration Metrics section:
+
+- `converging`: 0 new findings, or fewer new findings than the prior iteration
 - `deadlocked`: 0 new findings but recurring findings persist
-- `diverging`: more new findings than the prior iteration reported
+- `diverging`: more new findings than the prior iteration
 
 ## Response contract
 

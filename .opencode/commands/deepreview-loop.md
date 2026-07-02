@@ -60,16 +60,19 @@ Parse the stats line from the synthesizer. If it contains novelty metrics (the `
 NOVELTY MODE (iter2+ only):
 
 A) CONVERGENCE EXIT: If `0 new AND 0 regression`:
+
 - Tell the user: "deepreview-loop converged after $ITERATION iteration(s). No new findings detected."
 - STOP.
 
 B) DEADLOCK (synthesizer signal): If `0 new AND N recurring (N > 0) AND 0 regression` for 2 consecutive iterations:
+
 - Tell the user: "Deadlock detected: $N recurring findings persist with no new issues found across 2 iterations:"
 - List the recurring findings from the synthesis.
 - Ask: "How would you like to resolve these? Options: skip these findings, provide guidance, or stop the loop."
 - Follow the user's instruction.
 
 C) DEADLOCK (orchestrator fallback): Compare this iteration's findings (file:line + issue title) against the previous iteration's findings. If they match BUT the synthesizer did NOT signal deadlock (i.e., it classified some as [NEW]):
+
 - Log warning: "Note: deterministic check found matching findings, but synthesizer classified them as new. Trusting synthesizer classification."
 - Do NOT trigger deadlock. Continue.
 
@@ -83,12 +86,14 @@ Warn the user: "Synthesizer did not return novelty metrics — falling back to l
 
 DEADLOCK CHECK (iter 2+ only):
 Compare this iteration's findings (file:line + issue title) against the previous iteration's findings. If two consecutive iterations produce the SAME findings:
+
 - Tell the user: "Deadlock detected: the following findings persist across iterations:"
 - List the repeated findings.
 - Ask: "How would you like to resolve these? Options: skip these findings, provide guidance, or stop the loop."
 - Follow the user's instruction.
 
 If the synthesis/review has 0 critical AND 0 warning AND 0 suggestion findings:
+
 - Tell the user: "deepreview-loop complete after $ITERATION iteration(s). No findings remain."
 - STOP.
 
@@ -278,11 +283,13 @@ Extract PRIOR_FINDINGS_SECTION from PRIOR_CONTEXT: include only the "## Prior Fi
 If PRIOR_FINDINGS_SECTION is non-empty, include the novelty classification header in the synthesizer prompt. If empty (helper returned malformed context), omit the header — the synthesizer will operate in standard mode and the orchestrator MUST use LEGACY MODE for this iteration's exit check.
 
 Task 15 — Use the Task tool with subagent_type="deepreview-synthesizer":
+
 - If PRIOR_FINDINGS_SECTION is non-empty:
   "## Prior Findings for Novelty Classification
   $PRIOR_FINDINGS_SECTION
 
   Read the validated reviews at: $SESSION_DIR/validated-correctness.md, $SESSION_DIR/validated-security.md, $SESSION_DIR/validated-architecture.md, $SESSION_DIR/validated-docs.md, $SESSION_DIR/validated-compatibility.md, $SESSION_DIR/validated-performance.md, $SESSION_DIR/validated-maintainability.md (skip any that don't exist). Write the synthesis to $SESSION_DIR/synthesis.md."
+
 - If PRIOR_FINDINGS_SECTION is empty:
   "Read the validated reviews at: $SESSION_DIR/validated-correctness.md, $SESSION_DIR/validated-security.md, $SESSION_DIR/validated-architecture.md, $SESSION_DIR/validated-docs.md, $SESSION_DIR/validated-compatibility.md, $SESSION_DIR/validated-performance.md, $SESSION_DIR/validated-maintainability.md (skip any that don't exist). Write the synthesis to $SESSION_DIR/synthesis.md."
 
