@@ -205,11 +205,16 @@ Wait for all 5.
 Stage 3 — DISPATCH SYNTHESIZER:
 Extract PRIOR_FINDINGS_SECTION from PRIOR_CONTEXT: include only the "## Prior Findings" and "## Applied Fixes" sections (not "Known Issue Locations" or "Covered Regions" — those are for reviewers only).
 
-Task 11 — Use the Task tool with subagent_type="deepreview-synthesizer":
-"## Prior Findings for Novelty Classification
-$PRIOR_FINDINGS_SECTION
+If PRIOR_FINDINGS_SECTION is non-empty, include the novelty classification header in the synthesizer prompt. If empty (helper returned malformed context), omit the header — the synthesizer will operate in standard mode and the orchestrator MUST use LEGACY MODE for this iteration's exit check.
 
-Read the validated reviews at: $SESSION_DIR/validated-completeness.md, $SESSION_DIR/validated-consistency.md, $SESSION_DIR/validated-feasibility.md, $SESSION_DIR/validated-docs.md, $SESSION_DIR/validated-architecture.md (skip any that don't exist). Write the synthesis to $SESSION_DIR/synthesis.md."
+Task 11 — Use the Task tool with subagent_type="deepreview-synthesizer":
+- If PRIOR_FINDINGS_SECTION is non-empty:
+  "## Prior Findings for Novelty Classification
+  $PRIOR_FINDINGS_SECTION
+
+  Read the validated reviews at: $SESSION_DIR/validated-completeness.md, $SESSION_DIR/validated-consistency.md, $SESSION_DIR/validated-feasibility.md, $SESSION_DIR/validated-docs.md, $SESSION_DIR/validated-architecture.md (skip any that don't exist). Write the synthesis to $SESSION_DIR/synthesis.md."
+- If PRIOR_FINDINGS_SECTION is empty:
+  "Read the validated reviews at: $SESSION_DIR/validated-completeness.md, $SESSION_DIR/validated-consistency.md, $SESSION_DIR/validated-feasibility.md, $SESSION_DIR/validated-docs.md, $SESSION_DIR/validated-architecture.md (skip any that don't exist). Write the synthesis to $SESSION_DIR/synthesis.md."
 
 Record the stats line.
 
