@@ -28,6 +28,20 @@ export interface DeepReviewConfig {
   threatModel?: "localhost-only" | "internal-network" | "public-facing" | "library";
   /** Additional context hints for reviewers */
   context?: string;
+  /** Shared calibration entries and settings (opt-in team calibration) */
+  calibration?: {
+    settings?: { expiryDays?: number };
+    entries?: Array<{
+      id: string;
+      pattern: string;
+      context: string;
+      originalSeverity: string;
+      adjustedSeverity: string;
+      observedCount: number;
+      lastConfirmed: string;
+      createdAt: string;
+    }>;
+  };
 }
 
 interface PackageJson {
