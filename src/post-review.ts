@@ -156,6 +156,23 @@ async function postInlineThreads(
   return failedFindings;
 }
 
+async function tryReplyWithRetry(finding: ClassifiedFinding, body: string): Promise<boolean> {
+  try {
+    await replyToThread(finding.replyTo!, body);
+    return true;
+  } catch (err: unknown) {
+    if (!isRateLimitError(err)) return false;
+    console.warn(`Rate limited on reply to ${finding.replyTo}. Waiting 60s...`);
+    await Bun.sleep(60_000 + Math.floor(Math.random() * 10_000));
+    try {
+      await replyToThread(finding.replyTo!, body);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
 async function postReplyThreads(
   replyFindings: ClassifiedFinding[],
   reviewId: string,
@@ -170,34 +187,11 @@ async function postReplyThreads(
       batch.map(async (f) => {
         const id = findingId(f.path, f.startLine, f.line, f.body);
         const body = embedFindingId(f.renderedBody ?? f.body, id);
-        try {
-          await replyToThread(f.replyTo!, body);
-          return null;
-        } catch (err: unknown) {
-          if (isRateLimitError(err)) {
-            console.warn(`Rate limited on reply to ${f.replyTo}. Waiting 60s...`);
-            await Bun.sleep(60_000 + Math.floor(Math.random() * 10_000));
-            try {
-              await replyToThread(f.replyTo!, body);
-              return null;
-            } catch (retryErr: unknown) {
-              if (!isRateLimitError(retryErr)) {
-                const message = retryErr instanceof Error ? retryErr.message : String(retryErr);
-                console.warn(
-                  `WARN: Reply to thread ${f.replyTo} failed after retry (${message}). Falling back to new thread.`,
-                );
-                const ok = await postWithRetry(reviewId, f, body);
-                return ok ? null : id;
-              }
-            }
-          }
-          const message = err instanceof Error ? err.message : String(err);
-          console.warn(
-            `WARN: Reply to thread ${f.replyTo} failed (${message}). Falling back to new thread.`,
-          );
-          const ok = await postWithRetry(reviewId, f, body);
-          return ok ? null : id;
-        }
+        const replied = await tryReplyWithRetry(f, body);
+        if (replied) return null;
+        console.warn(`WARN: Reply to thread ${f.replyTo} failed. Falling back to new thread.`);
+        const ok = await postWithRetry(reviewId, f, body);
+        return ok ? null : id;
       }),
     );
     for (const id of results) {

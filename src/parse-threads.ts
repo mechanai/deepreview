@@ -35,16 +35,17 @@ function buildFinding(
   const rawReplyTo: unknown = data.replyTo;
   const replyTo = typeof rawReplyTo === "string" && rawReplyTo.length > 0 ? rawReplyTo : undefined;
 
+  // Replies don't use startLine; only set it when present and valid
+  const validStartLine =
+    replyTo === undefined &&
+    startLineNum !== undefined &&
+    startLineNum > 0 &&
+    Number.isFinite(startLineNum);
+
   return {
     path,
     line: lineNum,
-    startLine:
-      replyTo === undefined &&
-      startLineNum !== undefined &&
-      startLineNum > 0 &&
-      Number.isFinite(startLineNum)
-        ? startLineNum
-        : undefined,
+    startLine: validStartLine ? startLineNum : undefined,
     body,
     replyTo,
   };
