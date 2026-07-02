@@ -5,6 +5,7 @@ export interface Finding {
   line: number;
   startLine?: number;
   body: string;
+  replyTo?: string;
 }
 
 export interface ClassifiedFinding extends Finding {

@@ -125,3 +125,44 @@ describe("parseThreads findings", () => {
     assert.equal(result.findings.length, 0);
   });
 });
+
+describe("parseThreads replyTo", () => {
+  it("extracts replyTo from frontmatter", () => {
+    const input = [
+      "---",
+      "path: src/foo.ts",
+      "line: 42",
+      "replyTo: PRT_kwDOABC123",
+      "---",
+      "This adds a suggestion.",
+    ].join("\n");
+
+    const result = parseThreads(input);
+    assert.equal(result.findings.length, 1);
+    assert.equal(result.findings[0].replyTo, "PRT_kwDOABC123");
+    assert.equal(result.findings[0].startLine, undefined);
+  });
+
+  it("returns undefined replyTo when not present", () => {
+    const input = ["---", "path: src/foo.ts", "line: 42", "---", "Normal finding."].join("\n");
+
+    const result = parseThreads(input);
+    assert.equal(result.findings[0].replyTo, undefined);
+  });
+
+  it("replyTo and startLine are mutually exclusive — replyTo wins", () => {
+    const input = [
+      "---",
+      "path: src/foo.ts",
+      "startLine: 40",
+      "line: 45",
+      "replyTo: PRT_kwDOABC123",
+      "---",
+      "Reply body.",
+    ].join("\n");
+
+    const result = parseThreads(input);
+    assert.equal(result.findings[0].replyTo, "PRT_kwDOABC123");
+    assert.equal(result.findings[0].startLine, undefined);
+  });
+});

@@ -21,6 +21,35 @@ const safeYamlEngine = (s: string): Record<string, unknown> => {
 };
 const matterOptions = { engines: { yaml: safeYamlEngine } };
 
+/** Build a Finding from parsed frontmatter data and body content. */
+function buildFinding(
+  data: Record<string, unknown>,
+  path: string,
+  lineNum: number,
+  body: string,
+): Finding {
+  const rawStartLine: unknown = data.startLine;
+  const startLineNum =
+    rawStartLine !== null && rawStartLine !== undefined ? Number(rawStartLine) : undefined;
+
+  const rawReplyTo: unknown = data.replyTo;
+  const replyTo = typeof rawReplyTo === "string" && rawReplyTo.length > 0 ? rawReplyTo : undefined;
+
+  return {
+    path,
+    line: lineNum,
+    startLine:
+      replyTo === undefined &&
+      startLineNum !== undefined &&
+      startLineNum > 0 &&
+      Number.isFinite(startLineNum)
+        ? startLineNum
+        : undefined,
+    body,
+    replyTo,
+  };
+}
+
 /**
  * Parse a threads.md file into findings and an optional summary.
  * The file uses --- separators between documents, each with YAML frontmatter.
@@ -60,18 +89,7 @@ function parseThreads(content: string): ParsedThreads {
       continue;
     }
 
-    const rawStartLine: unknown = data.startLine;
-    const startLineNum =
-      rawStartLine !== null && rawStartLine !== undefined ? Number(rawStartLine) : undefined;
-    findings.push({
-      path,
-      line: lineNum,
-      startLine:
-        startLineNum !== undefined && startLineNum > 0 && Number.isFinite(startLineNum)
-          ? startLineNum
-          : undefined,
-      body: parsed.content.trim(),
-    });
+    findings.push(buildFinding(data, path, lineNum, parsed.content.trim()));
   }
 
   return { findings, summary };
