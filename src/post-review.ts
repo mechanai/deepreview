@@ -1,4 +1,3 @@
-// oxlint-disable max-lines -- Why: posting orchestration file coordinates retry, batching, reply routing, and stats; further splitting would fragment closely related logic
 import { type ClassifiedFinding, type ReplyFinding } from "./diff-classifier.ts";
 import { type PrInfo, execFileAsync } from "./graphql.ts";
 import {
@@ -12,13 +11,13 @@ import {
   replyToThread,
 } from "./review-api.ts";
 import {
-  isRateLimitError,
   findingId,
   embedFindingId,
   extractFindingId,
   buildReviewBody,
   classifyAndLog,
 } from "./review-helpers.ts";
+import { mapBatch, withRateLimitRetry } from "./batch-retry.ts";
 import { loadAndValidatePr } from "./load-pr.ts";
 
 export interface PostReviewOptions {
@@ -37,29 +36,6 @@ export interface PostReviewResult {
 }
 
 const MAX_INLINE_FINDINGS = 200;
-const BATCH_CONCURRENCY = 2;
-const BATCH_DELAY_MS = 1000;
-
-interface BatchOptions {
-  concurrency?: number;
-  delayMs?: number;
-}
-
-/** Process items in batches with concurrency and inter-batch delay. */
-async function mapBatch<T, R>(
-  items: T[],
-  fn: (item: T) => Promise<R>,
-  opts: BatchOptions = {},
-): Promise<R[]> {
-  const concurrency = opts.concurrency ?? BATCH_CONCURRENCY;
-  const delayMs = opts.delayMs ?? BATCH_DELAY_MS;
-  const results: R[] = [];
-  for (let i = 0; i < items.length; i += concurrency) {
-    if (i > 0) await Bun.sleep(delayMs);
-    results.push(...(await Promise.all(items.slice(i, i + concurrency).map(fn))));
-  }
-  return results;
-}
 
 async function updateExistingThreads(
   existingReview: PendingReview,
@@ -99,44 +75,6 @@ async function postThread(
     await addLineThread(reviewId, finding.path, finding.line, finding.startLine, body);
   } else {
     await addFileThread(reviewId, finding.path, body);
-  }
-}
-
-const RATE_LIMIT_DELAY_MS = 60_000;
-const RATE_LIMIT_JITTER_MS = 10_000;
-const MAX_RATE_LIMIT_RETRIES = 2;
-
-/** Retry an async operation with rate-limit-aware backoff. Returns true on success. */
-async function withRateLimitRetry(
-  fn: () => Promise<void>,
-  label: string,
-  maxRetries: number = MAX_RATE_LIMIT_RETRIES,
-): Promise<boolean> {
-  try {
-    await fn();
-    return true;
-  } catch (err: unknown) {
-    if (!isRateLimitError(err)) {
-      const message = err instanceof Error ? err.message : String(err);
-      console.error(`FAIL: ${label} — ${message}`);
-      return false;
-    }
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-      console.warn(`Rate limited on ${label}. Waiting 60s (retry ${attempt + 1}/${maxRetries})...`);
-      await Bun.sleep(RATE_LIMIT_DELAY_MS + Math.floor(Math.random() * RATE_LIMIT_JITTER_MS));
-      try {
-        await fn();
-        return true;
-      } catch (retryErr: unknown) {
-        if (!isRateLimitError(retryErr)) {
-          const message = retryErr instanceof Error ? retryErr.message : String(retryErr);
-          console.error(`FAIL: ${label} — ${message}`);
-          return false;
-        }
-      }
-    }
-    console.error(`FAIL: ${label} — rate limited after retries`);
-    return false;
   }
 }
 
