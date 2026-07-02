@@ -8,6 +8,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { load as loadYaml } from "js-yaml";
+import type { Severity } from "./calibration";
 
 export interface ProjectMetadata {
   /** Semantic version (e.g., "0.1.0", "3.2.1") */
@@ -35,8 +36,8 @@ export interface DeepReviewConfig {
       id: string;
       pattern: string;
       context: string;
-      originalSeverity: string;
-      adjustedSeverity: string;
+      originalSeverity: Severity;
+      adjustedSeverity: Severity;
       observedCount: number;
       lastConfirmed: string;
       createdAt: string;

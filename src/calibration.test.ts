@@ -137,8 +137,10 @@ entries:
   });
 
   it("uses shared expiryDays when local has no settings", () => {
-    // 60+ days won't expire with 90-day setting
-    const oldDate = "2026-05-01";
+    // Compute a date 60 days ago — with 90-day expiry this should still be active
+    const d = new Date();
+    d.setDate(d.getDate() - 60);
+    const oldDate = d.toISOString().split("T")[0];
     const sharedYaml = `
 threatModel: localhost-only
 calibration:
@@ -217,6 +219,7 @@ describe("calibration: writeCalibration", () => {
   it("creates directory and writes YAML file", () => {
     const writeRoot = path.join(TEST_ROOT, "write-test");
     mkdirSync(writeRoot, { recursive: true });
+    const today = new Date().toISOString().split("T")[0];
 
     writeCalibration(writeRoot, {
       version: 1,
@@ -229,8 +232,8 @@ describe("calibration: writeCalibration", () => {
           originalSeverity: "warning",
           adjustedSeverity: "suggestion",
           observedCount: 1,
-          lastConfirmed: "2026-07-01",
-          createdAt: "2026-07-01",
+          lastConfirmed: today,
+          createdAt: today,
         },
       ],
     });
