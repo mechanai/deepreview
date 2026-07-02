@@ -36,6 +36,18 @@ export interface PostReviewResult {
 }
 
 const MAX_INLINE_FINDINGS = 200;
+const BATCH_CONCURRENCY = 2;
+const BATCH_DELAY_MS = 1000;
+
+/** Process items in batches with concurrency and inter-batch delay. */
+async function mapBatch<T, R>(items: T[], fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = [];
+  for (let i = 0; i < items.length; i += BATCH_CONCURRENCY) {
+    if (i > 0) await Bun.sleep(BATCH_DELAY_MS);
+    results.push(...(await Promise.all(items.slice(i, i + BATCH_CONCURRENCY).map(fn))));
+  }
+  return results;
+}
 
 async function updateExistingThreads(
   existingReview: PendingReview,
@@ -57,17 +69,10 @@ async function updateExistingThreads(
     }
   }
 
-  const CONCURRENCY = 2;
-  for (let i = 0; i < toUpdate.length; i += CONCURRENCY) {
-    if (i > 0) await Bun.sleep(1000);
-    const batch = toUpdate.slice(i, i + CONCURRENCY);
-    await Promise.all(
-      batch.map(async ({ finding, commentId, id }) => {
-        const body = embedFindingId(finding.renderedBody ?? finding.body, id);
-        await updateReviewComment(commentId, body);
-      }),
-    );
-  }
+  await mapBatch(toUpdate, async ({ finding, commentId, id }) => {
+    const body = embedFindingId(finding.renderedBody ?? finding.body, id);
+    await updateReviewComment(commentId, body);
+  });
 
   console.log(`Updated ${toUpdate.length} existing threads.`);
   return new Set(toUpdate.map(({ id }) => id));
@@ -139,8 +144,6 @@ async function postInlineThreads(
   inlineFindings: ClassifiedFinding[],
   updatedIds: Set<string>,
 ): Promise<string[]> {
-  const CONCURRENCY = 2;
-  const failedFindings: string[] = [];
   const pending = inlineFindings.filter(
     (f) => !updatedIds.has(findingId(f.path, f.startLine, f.line, f.body)),
   );
@@ -152,54 +155,33 @@ async function postInlineThreads(
   }
   const capped = pending.slice(0, MAX_INLINE_FINDINGS);
 
-  for (let i = 0; i < capped.length; i += CONCURRENCY) {
-    if (i > 0) await Bun.sleep(1000);
-    const batch = capped.slice(i, i + CONCURRENCY);
-    const results = await Promise.all(
-      batch.map(async (f) => {
-        const id = findingId(f.path, f.startLine, f.line, f.body);
-        const body = embedFindingId(f.renderedBody ?? f.body, id);
-        const ok = await postWithRetry(reviewId, f, body);
-        return ok ? null : id;
-      }),
-    );
-    for (const id of results) {
-      if (id !== null) failedFindings.push(id);
-    }
-  }
-  return failedFindings;
+  const results = await mapBatch(capped, async (f) => {
+    const id = findingId(f.path, f.startLine, f.line, f.body);
+    const body = embedFindingId(f.renderedBody ?? f.body, id);
+    const ok = await postWithRetry(reviewId, f, body);
+    return ok ? null : id;
+  });
+  return results.filter((id): id is string => id !== null);
 }
 
 async function postReplyThreads(
   replyFindings: ClassifiedFinding[],
   reviewId: string,
 ): Promise<string[]> {
-  const CONCURRENCY = 2;
-  const failedIds: string[] = [];
-
-  for (let i = 0; i < replyFindings.length; i += CONCURRENCY) {
-    if (i > 0) await Bun.sleep(1000);
-    const batch = replyFindings.slice(i, i + CONCURRENCY);
-    const results = await Promise.all(
-      batch.map(async (f) => {
-        const id = findingId(f.path, f.startLine, f.line, f.body);
-        const body = embedFindingId(f.renderedBody ?? f.body, id);
-        const threadId = f.replyTo!;
-        const replied = await withRateLimitRetry(
-          async () => replyToThread(threadId, body),
-          `reply to ${threadId}`,
-        );
-        if (replied) return null;
-        console.warn(`WARN: Reply to thread ${threadId} failed. Falling back to new thread.`);
-        const ok = await postWithRetry(reviewId, f, body);
-        return ok ? null : id;
-      }),
+  const results = await mapBatch(replyFindings, async (f) => {
+    const id = findingId(f.path, f.startLine, f.line, f.body);
+    const body = embedFindingId(f.renderedBody ?? f.body, id);
+    const threadId = f.replyTo!;
+    const replied = await withRateLimitRetry(
+      async () => replyToThread(threadId, body),
+      `reply to ${threadId}`,
     );
-    for (const id of results) {
-      if (id !== null) failedIds.push(id);
-    }
-  }
-  return failedIds;
+    if (replied) return null;
+    console.warn(`WARN: Reply to thread ${threadId} failed. Falling back to new thread.`);
+    const ok = await postWithRetry(reviewId, f, body);
+    return ok ? null : id;
+  });
+  return results.filter((id): id is string => id !== null);
 }
 
 async function ensureReview(
