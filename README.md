@@ -65,27 +65,15 @@ path (single-pass reviewer, ~80% fewer tokens). Use `--full` to override.
 ## Pipeline
 
 ```mermaid
-graph LR
+flowchart TB
     subgraph reviewers["Stage 1 — Reviewers (parallel)"]
-        direction TB
-        R1[correctness]
-        R2[security]
-        R3[architecture]
-        R4[docs]
-        R5[compatibility]
-        R6[performance]
-        R7[maintainability]
+        direction LR
+        R1[correctness] ~~~ R2[security] ~~~ R3[architecture] ~~~ R4[docs] ~~~ R5[compatibility] ~~~ R6[performance] ~~~ R7[maintainability]
     end
 
     subgraph validators["Stage 2 — Validators (parallel)"]
-        direction TB
-        V1[correctness]
-        V2[security]
-        V3[architecture]
-        V4[docs]
-        V5[compatibility]
-        V6[performance]
-        V7[maintainability]
+        direction LR
+        V1[correctness] ~~~ V2[security] ~~~ V3[architecture] ~~~ V4[docs] ~~~ V5[compatibility] ~~~ V6[performance] ~~~ V7[maintainability]
     end
 
     reviewers --> validators
@@ -100,7 +88,7 @@ claims from its assigned perspective. For small diffs, the abbreviated path coll
 Stages 1–2 into a single reviewer:
 
 ```mermaid
-graph LR
+flowchart TB
     QR[Quick Reviewer] --> P[Planner]
     P --> PV[Plan-Validator]
     PV --> A[Applier]
