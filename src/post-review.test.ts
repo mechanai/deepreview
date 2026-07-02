@@ -60,6 +60,32 @@ describe("postReview reply routing", () => {
   });
 });
 
+describe("postReview dry-run with replyTo", () => {
+  it("includes reply findings in dry-run count", () => {
+    const threadsContent = [
+      "---",
+      "path: src/foo.ts",
+      "line: 10",
+      "replyTo: PRT_kwDOABC123",
+      "---",
+      "Reply finding.",
+      "---",
+      "path: src/bar.ts",
+      "startLine: 5",
+      "line: 10",
+      "---",
+      "New finding.",
+    ].join("\n");
+
+    const { findings } = parseThreads(threadsContent);
+    assert.equal(findings.length, 2);
+    assert.equal(findings[0].replyTo, "PRT_kwDOABC123");
+    assert.equal(findings[0].startLine, undefined);
+    assert.equal(findings[1].replyTo, undefined);
+    assert.equal(findings[1].startLine, 5);
+  });
+});
+
 describe("integration: parse → classify", () => {
   const threadsContent = [
     "---",
