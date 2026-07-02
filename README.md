@@ -133,7 +133,7 @@ bunx @mechanai/deepreview@latest/setup --local
 ```
 
 > [!NOTE]
-> If upgrading from the old `npx @anthropic/deepreview install` workflow, remove
+> If upgrading from the old `npx @mechanai/deepreview install` workflow, remove
 > the old copied files first (`rm ~/.config/opencode/agents/deepreview*
 ~/.config/opencode/commands/deepreview*`), then run the setup script above.
 > The setup script uses symlinks instead of copies, so future upgrades only
