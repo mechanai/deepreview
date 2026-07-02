@@ -16,6 +16,7 @@ Parse "$ARGUMENTS" the same way as /deepreview:
 
 Set ITERATION=1
 Set PRIOR_CONTEXT="" (empty — built up across iterations; holds both design context and prior findings)
+Set CONSECUTIVE_ZERO_NEW=0 (tracks consecutive iterations with 0 new findings for deadlock detection)
 Set ALL_SESSION_DIRS=[] (list of all session directories used, in order)
 
 Determine REPO_ROOT — the main repository root (not a worktree root). Run:
@@ -53,19 +54,42 @@ Run the full deepreview pipeline (Stages 1-5 from the deepreview command):
 Record the stats from the synthesis return: count of critical, warning, and suggestion findings.
 
 STEP 3: CHECK EXIT CONDITION
+
+Parse the stats line from the synthesizer. If it contains novelty metrics (the `| N new, N recurring, N regression` suffix), use NOVELTY MODE. Otherwise use LEGACY MODE.
+
+NOVELTY MODE (iter2+ only):
+
+A) CONVERGENCE EXIT: If `0 new AND 0 regression`:
+- Tell the user: "deepreview-loop converged after $ITERATION iteration(s). No new findings detected."
+- STOP.
+
+B) DEADLOCK (synthesizer signal): If `0 new AND N recurring (N > 0) AND 0 regression` for 2 consecutive iterations:
+- Tell the user: "Deadlock detected: $N recurring findings persist with no new issues found across 2 iterations:"
+- List the recurring findings from the synthesis.
+- Ask: "How would you like to resolve these? Options: skip these findings, provide guidance, or stop the loop."
+- Follow the user's instruction.
+
+C) DEADLOCK (orchestrator fallback): Compare this iteration's findings (file:line + issue title) against the previous iteration's findings. If they match BUT the synthesizer did NOT signal deadlock (i.e., it classified some as [NEW]):
+- Log warning: "Note: deterministic check found matching findings, but synthesizer classified them as new. Trusting synthesizer classification."
+- Do NOT trigger deadlock. Continue.
+
+D) Otherwise: proceed to STEP 4.
+
+Tracking: If `0 new`, increment CONSECUTIVE_ZERO_NEW. If `> 0 new`, reset CONSECUTIVE_ZERO_NEW to 0. Deadlock (B) triggers when CONSECUTIVE_ZERO_NEW >= 2 AND recurring > 0.
+
+LEGACY MODE (fallback when synthesizer omits novelty metrics):
+
+Warn the user: "Synthesizer did not return novelty metrics — falling back to legacy convergence detection."
+
 DEADLOCK CHECK (iter 2+ only):
-Compare this iteration's findings (file:line + issue title) against the previous iteration's findings. If two consecutive iterations produce the SAME findings, this indicates a deadlock — the applier is making changes that don't resolve the issue, or the reviewer keeps flagging the same thing.
-
-When deadlock is detected:
-
+Compare this iteration's findings (file:line + issue title) against the previous iteration's findings. If two consecutive iterations produce the SAME findings:
 - Tell the user: "Deadlock detected: the following findings persist across iterations:"
 - List the repeated findings.
 - Ask: "How would you like to resolve these? Options: skip these findings, provide guidance, or stop the loop."
 - Follow the user's instruction.
 
 If the synthesis/review has 0 critical AND 0 warning AND 0 suggestion findings:
-
-- Tell the user: "deepreviewloop complete after $ITERATION iteration(s). No findings remain."
+- Tell the user: "deepreview-loop complete after $ITERATION iteration(s). No findings remain."
 - STOP.
 
 STEP 4: APPLY ALL FIXES
@@ -249,8 +273,13 @@ Task 14 — Use the Task tool with subagent_type="deepreview-validator":
 Wait for all 7 to return.
 
 Stage 3 — DISPATCH SYNTHESIZER:
+Extract PRIOR_FINDINGS_SECTION from PRIOR_CONTEXT: include only the "## Prior Findings" and "## Applied Fixes" sections (not "Known Issue Locations" or "Covered Regions" — those are for reviewers only).
+
 Task 15 — Use the Task tool with subagent_type="deepreview-synthesizer":
-"Read the validated reviews at: $SESSION_DIR/validated-correctness.md, $SESSION_DIR/validated-security.md, $SESSION_DIR/validated-architecture.md, $SESSION_DIR/validated-docs.md, $SESSION_DIR/validated-compatibility.md, $SESSION_DIR/validated-performance.md, $SESSION_DIR/validated-maintainability.md (skip any that don't exist). Write the synthesis to $SESSION_DIR/synthesis.md."
+"## Prior Findings for Novelty Classification
+$PRIOR_FINDINGS_SECTION
+
+Read the validated reviews at: $SESSION_DIR/validated-correctness.md, $SESSION_DIR/validated-security.md, $SESSION_DIR/validated-architecture.md, $SESSION_DIR/validated-docs.md, $SESSION_DIR/validated-compatibility.md, $SESSION_DIR/validated-performance.md, $SESSION_DIR/validated-maintainability.md (skip any that don't exist). Write the synthesis to $SESSION_DIR/synthesis.md."
 
 Record the stats line.
 
