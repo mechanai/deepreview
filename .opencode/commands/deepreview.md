@@ -7,8 +7,8 @@ You are an orchestrator for a multi-agent code review pipeline. Follow these ste
 STEP 1: DETERMINE INPUT MODE AND SESSION DIRECTORY
 Classify "$ARGUMENTS":
 
-- If it starts with `--full`, extract FORCE_FULL=true and remove `--full` from $ARGUMENTS before parsing the rest. Otherwise set FORCE_FULL=false.
-- If it starts with `--context <path>`, extract CONTEXT_FILE=<path> and remove it from $ARGUMENTS before parsing the rest.
+- If `$ARGUMENTS` contains `--full`, extract FORCE_FULL=true and remove `--full` from $ARGUMENTS. Otherwise set FORCE_FULL=false.
+- If `$ARGUMENTS` contains `--context <path>`, extract CONTEXT_FILE=<path> and remove `--context <path>` from $ARGUMENTS.
 - Validate CONTEXT_FILE: it must be a relative path (no leading `/`), must not contain `..`, must exist on disk, and must be a regular file (not a directory or symlink to outside the project), and must be under 50KB. If validation fails, tell the user the error and STOP.
 - If it is a number → MODE=pr
 - If it is a file path (ends in .md, .txt, .yaml, .json, or file exists on disk) → MODE=files
@@ -77,7 +77,7 @@ If both are empty, set CONTEXT_PREAMBLE="" (empty string).
 STEP 2c: CHECK DIFF SIZE AND ROUTE
 If FORCE_FULL is true: proceed to STEP 3 (full pipeline).
 
-If MODE is "files": proceed to STEP 3 (full pipeline). (File mode has no diff metrics to measure.)
+If MODE is "files": proceed to STEP 3 (full pipeline).
 
 Otherwise (MODE is "pr" or "branch"):
 
@@ -188,10 +188,10 @@ Show the user:
 
 - Session directory: $SESSION_DIR/
 - Pipeline: abbreviated (single-pass) or full (7 reviewers + cross-validation)
-- Which reviewers completed (and any that failed)
-- Stats from synthesis (the stats line from Step 5)
-- Summary from planner (the summary line from Step 6)
-- Plan validation stats (if available, from Step 7)
+- For full pipeline: Which reviewers completed (and any that failed)
+- Stats from synthesis (from STEP 3-QUICK or STEP 5)
+- Summary from planner (from STEP 4-QUICK or STEP 6)
+- Plan validation stats (if available, from STEP 5-QUICK or STEP 7)
 - Ask: "Do you want me to apply the fixes?"
 
 STEP 9: IF USER SAYS YES — DISPATCH STAGE 6 (1 task)

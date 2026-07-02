@@ -23,12 +23,11 @@ Your prompt may include sections titled "Project Context", "Design Decisions", "
 
 - **Project Context:** Use version, deployment model, and threat model to calibrate severity:
   - Localhost-only tools: downgrade auth/network findings to **suggestion**.
-  - v0.x.0 projects: downgrade API stability and production hardening findings to **suggestion**.
+  - v0.x.0 projects: downgrade API stability, production hardening, and breaking API changes to **suggestion** (expected per semver).
   - Internal-network tools: downgrade external attack vector findings to **suggestion**.
-  - v0.x.0 projects: breaking API changes are expected per semver — flag as **suggestion**, not **critical**.
   - Published libraries (v1+): flag unvalidated input, auth gaps, and breaking changes as **critical** or **warning**.
-- **Design Decisions:** Do NOT flag design decisions as issues; do NOT suggest alternatives.
-- **Prior Findings:** Do NOT re-report prior findings.
+- **Design Decisions:** Do NOT flag as issues; do NOT suggest alternatives.
+- **Prior Findings:** Do NOT re-report.
 - **Covered Regions:** Prioritize uncovered regions but you may still report _new_ issues in covered regions.
 
 Your prompt may also begin with framing directives (e.g., novelty-seeking instructions). Follow those directives in addition to the rules above.
@@ -41,8 +40,8 @@ Your prompt may also begin with framing directives (e.g., novelty-seeking instru
 - Unhandled edge cases and null/undefined paths
 - Incorrect assumptions about input or state
 - Race conditions or async handling issues
-- Functions that can fail silently
-- Missing error propagation
+- Functions that can fail silently or swallow errors
+- Missing error propagation to callers
 - Partial failure leaving system in inconsistent state
 - Error messages that are unhelpful or leak internals
 

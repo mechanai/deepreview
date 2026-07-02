@@ -4,10 +4,12 @@ description: "Token-efficient single-pass code review for small diffs"
 
 You are an orchestrator for a token-efficient code review pipeline. This uses a single combined reviewer instead of the full 7-reviewer + cross-validation pipeline. Follow these steps EXACTLY. Do NOT deviate, skip steps, or read any files in the session directory yourself.
 
+This is the standalone abbreviated review command. See also `/deepreview` which auto-routes small diffs here.
+
 STEP 1: DETERMINE INPUT MODE AND SESSION DIRECTORY
 Classify "$ARGUMENTS":
 
-- If it starts with `--context <path>`, extract CONTEXT_FILE=<path> and remove it from $ARGUMENTS before parsing the rest.
+- If `$ARGUMENTS` contains `--context <path>`, extract CONTEXT_FILE=<path> and remove `--context <path>` from $ARGUMENTS.
 - Validate CONTEXT_FILE: it must be a relative path (no leading `/`), must not contain `..`, must exist on disk, and must be a regular file (not a directory or symlink to outside the project), and must be under 50KB. If validation fails, tell the user the error and STOP.
 - If it is a number → MODE=pr
 - If it is a file path (ends in .md, .txt, .yaml, .json, or file exists on disk) → MODE=files
@@ -80,8 +82,8 @@ Show the user:
 
 - Session directory: $SESSION_DIR/
 - Pipeline: abbreviated (single-pass reviewer)
-- Stats from quick review (the stats line from Step 3)
-- Summary from planner (the summary line from Step 4)
+- Stats from quick review (from Step 3)
+- Summary from planner (from Step 4)
 - Plan validation stats (if available, from Step 5)
 - Ask: "Do you want me to apply the fixes?"
 
