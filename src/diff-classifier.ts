@@ -14,6 +14,11 @@ export interface ClassifiedFinding extends Finding {
   renderedBody?: string;
 }
 
+/** A classified finding that targets an existing thread for reply. */
+export interface ReplyFinding extends ClassifiedFinding {
+  replyTo: string;
+}
+
 interface FileHunks {
   hunks: { newStart: number; newLines: number }[];
 }

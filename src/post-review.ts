@@ -1,4 +1,5 @@
-import { type ClassifiedFinding } from "./diff-classifier.ts";
+// oxlint-disable max-lines -- Why: posting orchestration file coordinates retry, batching, reply routing, and stats; further splitting would fragment closely related logic
+import { type ClassifiedFinding, type ReplyFinding } from "./diff-classifier.ts";
 import { type PrInfo, execFileAsync } from "./graphql.ts";
 import {
   type PendingReview,
@@ -39,12 +40,23 @@ const MAX_INLINE_FINDINGS = 200;
 const BATCH_CONCURRENCY = 2;
 const BATCH_DELAY_MS = 1000;
 
+interface BatchOptions {
+  concurrency?: number;
+  delayMs?: number;
+}
+
 /** Process items in batches with concurrency and inter-batch delay. */
-async function mapBatch<T, R>(items: T[], fn: (item: T) => Promise<R>): Promise<R[]> {
+async function mapBatch<T, R>(
+  items: T[],
+  fn: (item: T) => Promise<R>,
+  opts: BatchOptions = {},
+): Promise<R[]> {
+  const concurrency = opts.concurrency ?? BATCH_CONCURRENCY;
+  const delayMs = opts.delayMs ?? BATCH_DELAY_MS;
   const results: R[] = [];
-  for (let i = 0; i < items.length; i += BATCH_CONCURRENCY) {
-    if (i > 0) await Bun.sleep(BATCH_DELAY_MS);
-    results.push(...(await Promise.all(items.slice(i, i + BATCH_CONCURRENCY).map(fn))));
+  for (let i = 0; i < items.length; i += concurrency) {
+    if (i > 0) await Bun.sleep(delayMs);
+    results.push(...(await Promise.all(items.slice(i, i + concurrency).map(fn))));
   }
   return results;
 }
@@ -143,17 +155,18 @@ async function postInlineThreads(
   reviewId: string,
   inlineFindings: ClassifiedFinding[],
   updatedIds: Set<string>,
+  maxThreads: number = MAX_INLINE_FINDINGS,
 ): Promise<string[]> {
   const pending = inlineFindings.filter(
     (f) => !updatedIds.has(findingId(f.path, f.startLine, f.line, f.body)),
   );
 
-  if (pending.length > MAX_INLINE_FINDINGS) {
+  if (pending.length > maxThreads) {
     console.warn(
-      `WARN: ${pending.length} inline findings exceed limit of ${MAX_INLINE_FINDINGS}. Truncating.`,
+      `WARN: ${pending.length} inline findings exceed limit of ${maxThreads}. Truncating.`,
     );
   }
-  const capped = pending.slice(0, MAX_INLINE_FINDINGS);
+  const capped = pending.slice(0, maxThreads);
 
   const results = await mapBatch(capped, async (f) => {
     const id = findingId(f.path, f.startLine, f.line, f.body);
@@ -165,23 +178,32 @@ async function postInlineThreads(
 }
 
 async function postReplyThreads(
-  replyFindings: ClassifiedFinding[],
+  replyFindings: ReplyFinding[],
   reviewId: string,
-): Promise<string[]> {
+  inlineBudgetRemaining: number,
+): Promise<{ failedIds: string[]; fallbackCount: number }> {
+  let fallbackCount = 0;
   const results = await mapBatch(replyFindings, async (f) => {
     const id = findingId(f.path, f.startLine, f.line, f.body);
     const body = embedFindingId(f.renderedBody ?? f.body, id);
-    const threadId = f.replyTo!;
     const replied = await withRateLimitRetry(
-      async () => replyToThread(threadId, body),
-      `reply to ${threadId}`,
+      async () => replyToThread(f.replyTo, body),
+      `reply to ${f.replyTo}`,
     );
     if (replied) return null;
-    console.warn(`WARN: Reply to thread ${threadId} failed. Falling back to new thread.`);
+    // Fallback: post as new thread, subject to inline cap
+    if (fallbackCount >= inlineBudgetRemaining) {
+      console.warn(
+        `WARN: Reply to thread ${f.replyTo} failed. Inline cap reached — skipping fallback.`,
+      );
+      return id;
+    }
+    console.warn(`WARN: Reply to thread ${f.replyTo} failed. Falling back to new thread.`);
+    fallbackCount++;
     const ok = await postWithRetry(reviewId, f, body);
     return ok ? null : id;
   });
-  return results.filter((id): id is string => id !== null);
+  return { failedIds: results.filter((id): id is string => id !== null), fallbackCount };
 }
 
 async function ensureReview(
@@ -213,6 +235,32 @@ async function ensureReview(
   return { reviewId, updatedFindings: new Set() };
 }
 
+interface StatusCounts {
+  posted: number;
+  total: number;
+  replies: number;
+  upToDate: number;
+  skipped: number;
+  failed: number;
+  truncated: number;
+  tier3Count: number;
+}
+
+function formatStatusSummary(counts: StatusCounts): string {
+  const parts: string[] = [];
+  if (counts.replies > 0) parts.push(`${counts.replies} replies`);
+  if (counts.upToDate > 0) parts.push(`${counts.upToDate} up-to-date`);
+  if (counts.skipped > 0) parts.push(`${counts.skipped} skipped`);
+  if (counts.failed > 0) parts.push(`${counts.failed} failed`);
+  if (counts.truncated > 0) parts.push(`${counts.truncated} truncated`);
+  const detail = parts.length > 0 ? ` (${parts.join(", ")})` : "";
+  return (
+    `Posted ${counts.posted}/${counts.total} inline threads${detail}. ` +
+    `${counts.tier3Count} findings in review body.`
+  );
+}
+
+// oxlint-disable-next-line max-lines-per-function -- Why: orchestration function that coordinates reply/new posting and computes stats; splitting further would fragment the logic
 async function postFindings(
   tier1: ClassifiedFinding[],
   tier2: ClassifiedFinding[],
@@ -241,27 +289,48 @@ async function postFindings(
 
   // Split into reply findings and new findings
   const replyFindings = allInline.filter(
-    (f) =>
+    (f): f is ReplyFinding =>
       f.replyTo !== undefined &&
       !updatedFindings.has(findingId(f.path, f.startLine, f.line, f.body)),
   );
   const newFindings = allInline.filter((f) => f.replyTo === undefined);
 
-  const replyFailedIds = await postReplyThreads(replyFindings, reviewId);
-  const newFailedIds = await postInlineThreads(reviewId, newFindings, updatedFindings);
+  // Post replies first (fallbacks count against inline cap)
+  const inlineBudget = MAX_INLINE_FINDINGS;
+  const { failedIds: replyFailedIds, fallbackCount } = await postReplyThreads(
+    replyFindings,
+    reviewId,
+    inlineBudget,
+  );
+
+  // Post new threads with remaining budget after reply fallbacks
+  const newFailedIds = await postInlineThreads(
+    reviewId,
+    newFindings,
+    updatedFindings,
+    inlineBudget - fallbackCount,
+  );
 
   const failedIds = [...replyFailedIds, ...newFailedIds];
   const skipped = newFindings.filter((f) =>
     updatedFindings.has(findingId(f.path, f.startLine, f.line, f.body)),
   ).length;
   const pendingNew = newFindings.length - skipped;
-  const postedNew = Math.min(pendingNew, MAX_INLINE_FINDINGS) - newFailedIds.length;
+  const postedNew = Math.min(pendingNew, inlineBudget - fallbackCount) - newFailedIds.length;
   const postedReplies = replyFindings.length - replyFailedIds.length;
   const totalFindings = [...tier1, ...tier2].length;
-  const truncated = Math.max(0, pendingNew - MAX_INLINE_FINDINGS);
-  const statusSummary =
-    `Posted ${postedNew + postedReplies}/${totalFindings} inline threads` +
-    ` (${postedReplies} replies, ${skipped} up-to-date, ${totalFindings - allInline.length} skipped, ${failedIds.length} failed${truncated > 0 ? `, ${truncated} truncated` : ""}). ${tier3.length} findings in review body.`;
+  const truncated = Math.max(0, pendingNew - (inlineBudget - fallbackCount));
+
+  const statusSummary = formatStatusSummary({
+    posted: postedNew + postedReplies,
+    total: totalFindings,
+    replies: postedReplies,
+    upToDate: skipped,
+    skipped: totalFindings - allInline.length,
+    failed: failedIds.length,
+    truncated,
+    tier3Count: tier3.length,
+  });
 
   console.log(statusSummary);
   return { summary: statusSummary, failed: failedIds };
@@ -288,8 +357,15 @@ export async function postReview(opts: PostReviewOptions): Promise<PostReviewRes
   const { tier1, tier2, tier3 } = classifyAndLog(findings, diff);
 
   if (dryRun) {
+    const replyCount = findings.filter((f) => f.replyTo !== undefined).length;
+    const parts = [
+      `${tier1.length} line-level`,
+      `${tier2.length} file-level`,
+      `${tier3.length} review-body`,
+    ];
+    if (replyCount > 0) parts.push(`${replyCount} replies`);
     return {
-      summary: `Dry run: ${tier1.length} line-level, ${tier2.length} file-level, ${tier3.length} review-body findings.`,
+      summary: `Dry run: ${parts.join(", ")} findings.`,
       failed: [],
     };
   }
